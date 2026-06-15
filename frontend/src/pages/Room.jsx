@@ -11,12 +11,12 @@ export default function Room() {
   const { roomId } = useParams();
   const navigate = useNavigate();
   
-  // 永続的なプレイヤーIDを生成/取得
+  // 永続的なプレイヤーIDを生成/取得（タブごとに独立させるためsessionStorageを使用）
   const [myId] = useState(() => {
-    const saved = localStorage.getItem('werewolf_player_id');
+    const saved = sessionStorage.getItem('werewolf_player_id');
     if (saved) return saved;
     const newId = Math.random().toString(36).substring(2, 11);
-    localStorage.setItem('werewolf_player_id', newId);
+    sessionStorage.setItem('werewolf_player_id', newId);
     return newId;
   });
 

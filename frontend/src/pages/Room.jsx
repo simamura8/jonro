@@ -213,27 +213,49 @@ export default function Room() {
           <div className="glass-panel">
             <h3>プレイヤー</h3>
             <div className="player-grid">
-              {playersList.map((p) => (
-                <div 
-                  key={p.id} 
-                  className={`player-card ${!p.isAlive ? 'dead' : ''} ${selectedPlayerId === p.id ? 'selected' : ''}`}
-                  onClick={() => {
-                    if (p.isAlive && !actionDone && room.status !== 'day' && room.status !== 'waiting' && room.status !== 'finished') {
-                      setSelectedPlayerId(p.id);
-                    }
-                  }}
-                >
-                  <div style={{ fontWeight: 'bold' }}>{p.name}</div>
-                  {/* 人狼同士は仲間が見える */}
-                  {myPlayer?.role === '人狼' && p.role === '人狼' && room.status !== 'waiting' && (
-                    <div className="role-badge role-werewolf" style={{ fontSize: '0.6rem' }}>人狼</div>
-                  )}
-                  {/* 終了時は全員の役職を表示 */}
-                  {room.status === 'finished' && p.role && (
-                    <div className={`role-badge ${getRoleClass(p.role)}`} style={{ fontSize: '0.6rem' }}>{p.role}</div>
-                  )}
-                </div>
-              ))}
+              {playersList.map((p) => {
+                const isCandidate = !room.candidates || room.candidates.includes(p.id);
+                const isSelectable = p.isAlive && !actionDone && (
+                  room.status === 'night' || (room.status === 'voting' && isCandidate)
+                );
+
+                const isSelected = selectedPlayerId === p.id;
+
+                const notCandidateStyle = room.status === 'voting' && room.candidates && !room.candidates.includes(p.id) 
+                  ? { opacity: 0.3, cursor: 'not-allowed' } 
+                  : {};
+                  
+                const candidateStyle = room.status === 'voting' && room.candidates && room.candidates.includes(p.id) && !isSelected
+                  ? { boxShadow: '0 0 10px #fbbf24', borderColor: '#fbbf24' }
+                  : {};
+
+                const selectedStyle = isSelected
+                  ? { boxShadow: '0 0 15px #3b82f6', borderColor: '#3b82f6', transform: 'scale(1.05)', zIndex: 10 }
+                  : {};
+
+                return (
+                  <div 
+                    key={p.id} 
+                    className={`player-card ${!p.isAlive ? 'dead' : ''} ${isSelected ? 'selected' : ''}`}
+                    style={{ ...notCandidateStyle, ...candidateStyle, ...selectedStyle }}
+                    onClick={() => {
+                      if (isSelectable) {
+                        setSelectedPlayerId(p.id);
+                      }
+                    }}
+                  >
+                    <div style={{ fontWeight: 'bold' }}>{p.name}</div>
+                    {/* 人狼同士は仲間が見える */}
+                    {myPlayer?.role === '人狼' && p.role === '人狼' && room.status !== 'waiting' && (
+                      <div className="role-badge role-werewolf" style={{ fontSize: '0.6rem' }}>人狼</div>
+                    )}
+                    {/* 終了時は全員の役職を表示 */}
+                    {room.status === 'finished' && p.role && (
+                      <div className={`role-badge ${getRoleClass(p.role)}`} style={{ fontSize: '0.6rem' }}>{p.role}</div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             {/* アクションエリア */}
@@ -258,7 +280,9 @@ export default function Room() {
 
             {myPlayer?.isAlive && room.status === 'voting' && !actionDone && (
               <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px' }}>
-                <p style={{ marginBottom: '1rem' }}>処刑する相手を選んでください。</p>
+                <p style={{ marginBottom: '1rem' }}>
+                  {room.candidates ? '決選投票（再投票）です。候補者から選んでください。' : '処刑する相手を選んでください。'}
+                </p>
                 <button 
                   className="btn btn-danger" 
                   style={{ width: '100%' }}

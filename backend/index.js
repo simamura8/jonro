@@ -90,7 +90,9 @@ io.on('connection', (socket) => {
         logs: [],
         nightActions: {},
         votes: {},
-        winner: null
+        winner: null,
+        isRevote: false,
+        candidates: null
       };
     }
 
@@ -127,6 +129,8 @@ io.on('connection', (socket) => {
       room.logs.push('ゲームが開始されました。夜が訪れます...');
       room.nightActions = {};
       room.votes = {};
+      room.isRevote = false;
+      room.candidates = null;
 
       io.to(roomId).emit('room_update', room);
       io.to(roomId).emit('chat_message', {
@@ -274,46 +278,77 @@ io.on('connection', (socket) => {
     }
 
     let maxVotes = 0;
-    let executedId = null;
+    let candidates = [];
 
     for (const [targetId, count] of Object.entries(voteCounts)) {
       if (count > maxVotes) {
         maxVotes = count;
-        executedId = targetId;
+        candidates = [targetId];
       } else if (count === maxVotes) {
-        // 同数の場合はランダム処刑（MVP仕様）
-        if (Math.random() > 0.5) {
-          executedId = targetId;
-        }
+        candidates.push(targetId);
       }
     }
 
-    if (executedId && room.players[executedId]) {
+    if (maxVotes === 0) {
+      io.to(roomId).emit('chat_message', {
+        sender: 'System',
+        text: '投票の結果、誰も処刑されませんでした。',
+        isSystem: true
+      });
+      goToNextNight(room, roomId);
+      return;
+    }
+
+    if (candidates.length === 1) {
+      const executedId = candidates[0];
       room.players[executedId].isAlive = false;
       io.to(roomId).emit('chat_message', {
         sender: 'System',
         text: `投票の結果、${room.players[executedId].name} が処刑されました。`,
         isSystem: true
       });
+
+      // 勝敗判定
+      const winner = checkWinCondition(room);
+      if (winner) {
+        endGame(roomId, winner);
+        return;
+      }
+      goToNextNight(room, roomId);
     } else {
-      io.to(roomId).emit('chat_message', {
-        sender: 'System',
-        text: '投票の結果、誰も処刑されませんでした。',
-        isSystem: true
-      });
-    }
+      // 同数だった場合
+      if (room.isRevote) {
+        // すでに決選投票（再投票）だった場合
+        io.to(roomId).emit('chat_message', {
+          sender: 'System',
+          text: `決選投票の結果も同数だったため、誰も処刑されませんでした。`,
+          isSystem: true
+        });
+        goToNextNight(room, roomId);
+      } else {
+        // 最初の投票で同数 -> 決選投票へ
+        room.isRevote = true;
+        room.candidates = candidates; // 同数だったプレイヤーIDのリスト
+        room.votes = {}; // 投票結果をリセット
 
-    // 勝敗判定
-    const winner = checkWinCondition(room);
-    if (winner) {
-      endGame(roomId, winner);
-      return;
+        const candidateNames = candidates.map(id => room.players[id].name).join(', ');
+        
+        io.to(roomId).emit('room_update', room);
+        io.to(roomId).emit('chat_message', {
+          sender: 'System',
+          text: `投票が同数（${maxVotes}票）だったため、決選投票を行います。対象者: ${candidateNames}。もう一度投票してください。`,
+          isSystem: true
+        });
+      }
     }
+  }
 
-    // 次の夜へ
+  function goToNextNight(room, roomId) {
     room.status = 'night';
     room.dayCount += 1;
     room.votes = {};
+    room.isRevote = false;
+    room.candidates = null;
     
     io.to(roomId).emit('room_update', room);
     io.to(roomId).emit('chat_message', {
@@ -361,6 +396,8 @@ io.on('connection', (socket) => {
       room.nightActions = {};
       room.votes = {};
       room.winner = null;
+      room.isRevote = false;
+      room.candidates = null;
       // プレイヤーの状態をリセット
       Object.values(room.players).forEach(p => {
         p.role = null;

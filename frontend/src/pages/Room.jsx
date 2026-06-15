@@ -1,0 +1,324 @@
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { io } from 'socket.io-client';
+import { Copy, Play, Send, Moon, Sun, Skull, Trophy } from 'lucide-react';
+
+const SOCKET_URL = 'http://localhost:3001';
+
+export default function Room() {
+  const { roomId } = useParams();
+  const navigate = useNavigate();
+  const [socket, setSocket] = useState(null);
+  const [room, setRoom] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [playerName, setPlayerName] = useState('');
+  const [isNameSet, setIsNameSet] = useState(false);
+  const [selectedPlayerId, setSelectedPlayerId] = useState(null);
+  const [actionDone, setActionDone] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state?.playerName) {
+      setPlayerName(location.state.playerName);
+      setIsNameSet(true);
+    }
+  }, [location.state]);
+
+  useEffect(() => {
+    if (!isNameSet) return;
+
+    const newSocket = io(SOCKET_URL);
+    setSocket(newSocket);
+
+    newSocket.emit('join_room', { roomId, playerName });
+
+    newSocket.on('room_update', (updatedRoom) => {
+      setRoom(updatedRoom);
+      // フェーズが変わったら選択やアクション状態をリセット
+      setSelectedPlayerId(null);
+      setActionDone(false);
+      
+      // リセットされたらメッセージもクリアするなどの処理（今回はログを残しても良い）
+      if (updatedRoom.status === 'waiting' && updatedRoom.dayCount === 0) {
+        // 必要ならチャット履歴をクリア: setMessages([]);
+      }
+    });
+
+    newSocket.on('chat_message', (msg) => {
+      setMessages((prev) => [...prev, msg]);
+    });
+
+    return () => newSocket.close();
+  }, [roomId, isNameSet, playerName]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleJoinRoom = () => {
+    if (!playerName.trim()) {
+      alert('名前を入力してください');
+      return;
+    }
+    setIsNameSet(true);
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    alert('URLをコピーしました！友達に共有してください。');
+  };
+
+  const handleStartGame = () => {
+    socket.emit('start_game', roomId);
+  };
+
+  const handleRestartGame = () => {
+    socket.emit('restart_game', roomId);
+  };
+
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    socket.emit('send_message', { roomId, text: chatInput });
+    setChatInput('');
+  };
+
+  const handleNightAction = () => {
+    socket.emit('night_action', { roomId, targetId: selectedPlayerId });
+    setActionDone(true);
+  };
+
+  const handleVote = () => {
+    socket.emit('vote', { roomId, targetId: selectedPlayerId });
+    setActionDone(true);
+  };
+
+  const handleGoToVote = () => {
+    socket.emit('change_phase', { roomId, phase: 'voting' });
+  };
+
+  if (!isNameSet) {
+    return (
+      <div className="container">
+        <div className="glass-panel" style={{ maxWidth: '400px', margin: '10vh auto', textAlign: 'center' }}>
+          <h2>ルームに参加</h2>
+          <p style={{ marginBottom: '2rem', color: '#94a3b8' }}>ルーム: {roomId}</p>
+          <input 
+            type="text" 
+            className="input-field" 
+            placeholder="あなたの名前" 
+            value={playerName}
+            onChange={(e) => setPlayerName(e.target.value)}
+            maxLength={10}
+          />
+          <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleJoinRoom}>
+            ルームに参加する
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!room) {
+    return <div className="container" style={{ textAlign: 'center', marginTop: '20vh' }}>読み込み中...</div>;
+  }
+
+  const myPlayer = room.players[socket?.id];
+  const isHost = Object.keys(room.players)[0] === socket?.id;
+  const playersList = Object.values(room.players);
+
+  const getRoleClass = (role) => {
+    switch(role) {
+      case '村人': return 'role-villager';
+      case '人狼': return 'role-werewolf';
+      case '占い師': return 'role-seer';
+      case '騎士': return 'role-knight';
+      default: return '';
+    }
+  };
+
+  return (
+    <div className="container" style={{ paddingBottom: '2rem' }}>
+      <div className="glass-panel" style={{ marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2>ルーム: {roomId}</h2>
+          <button className="btn" style={{ background: 'rgba(255,255,255,0.1)', color: 'white' }} onClick={handleCopyLink}>
+            <Copy size={18} /> URLを共有
+          </button>
+        </div>
+        
+        {room.status === 'waiting' && (
+          <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '8px' }}>
+            <p>参加者を待っています... (現在 {playersList.length} 人)</p>
+            {isHost && playersList.length >= 4 && (
+              <button className="btn btn-primary" style={{ marginTop: '1rem' }} onClick={handleStartGame}>
+                <Play size={18} /> ゲームを開始する
+              </button>
+            )}
+            {isHost && playersList.length < 4 && (
+              <p style={{ color: '#fbbf24', fontSize: '0.9rem', marginTop: '1rem' }}>※開始するには最低4人必要です</p>
+            )}
+            {!isHost && (
+              <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginTop: '1rem' }}>ホストがゲームを開始するのを待っています...</p>
+            )}
+          </div>
+        )}
+
+        {room.status === 'finished' && (
+          <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(251, 191, 36, 0.1)', borderRadius: '8px', textAlign: 'center' }}>
+            <h3 style={{ color: '#fbbf24', margin: '0 0 1rem 0' }}>ゲーム終了</h3>
+            {isHost ? (
+              <button className="btn btn-primary" onClick={handleRestartGame}>
+                もう一度遊ぶ（同じメンバーで）
+              </button>
+            ) : (
+              <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>ホストが「もう一度遊ぶ」を選択するのを待っています...</p>
+            )}
+          </div>
+        )}
+
+        {room.status !== 'waiting' && myPlayer && (
+          <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ flex: 1 }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {room.status === 'day' && <Sun color="#fbbf24" />}
+                {room.status === 'night' && <Moon color="#a78bfa" />}
+                {room.status === 'voting' && <Skull color="#ef4444" />}
+                {room.status === 'finished' && <Trophy color="#fbbf24" />}
+                {room.status === 'day' && `昼 (Day ${room.dayCount})`}
+                {room.status === 'night' && `夜 (Day ${room.dayCount})`}
+                {room.status === 'voting' && '投票時間'}
+                {room.status === 'finished' && '結果発表'}
+              </h3>
+            </div>
+            {myPlayer.role && (
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>あなたの役職:</span>
+                <div className={`role-badge ${getRoleClass(myPlayer.role)}`} style={{ fontSize: '1rem', padding: '0.25rem 0.75rem', marginLeft: '0.5rem' }}>
+                  {myPlayer.role}
+                </div>
+                {!myPlayer.isAlive && <span style={{ color: '#ef4444', marginLeft: '0.5rem', fontWeight: 'bold' }}>[死亡]</span>}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+        {/* 左側：プレイヤー一覧とアクション */}
+        <div style={{ flex: '1 1 300px' }}>
+          <div className="glass-panel">
+            <h3>プレイヤー</h3>
+            <div className="player-grid">
+              {playersList.map((p) => (
+                <div 
+                  key={p.id} 
+                  className={`player-card ${!p.isAlive ? 'dead' : ''} ${selectedPlayerId === p.id ? 'selected' : ''}`}
+                  onClick={() => {
+                    if (p.isAlive && !actionDone && room.status !== 'day' && room.status !== 'waiting' && room.status !== 'finished') {
+                      setSelectedPlayerId(p.id);
+                    }
+                  }}
+                >
+                  <div style={{ fontWeight: 'bold' }}>{p.name}</div>
+                  {/* 人狼同士は仲間が見える */}
+                  {myPlayer?.role === '人狼' && p.role === '人狼' && room.status !== 'waiting' && (
+                    <div className="role-badge role-werewolf" style={{ fontSize: '0.6rem' }}>人狼</div>
+                  )}
+                  {/* 終了時は全員の役職を表示 */}
+                  {room.status === 'finished' && p.role && (
+                    <div className={`role-badge ${getRoleClass(p.role)}`} style={{ fontSize: '0.6rem' }}>{p.role}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* アクションエリア */}
+            {myPlayer?.isAlive && room.status === 'night' && !actionDone && (
+              <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+                <p style={{ marginBottom: '1rem' }}>
+                  {myPlayer.role === '村人' ? 'あなたは村人です。夜は何もできません。完了ボタンを押してください。' :
+                   myPlayer.role === '人狼' ? '襲撃する相手を選んでください。' :
+                   myPlayer.role === '占い師' ? '占う相手を選んでください。' :
+                   '護衛する相手を選んでください。'}
+                </p>
+                <button 
+                  className="btn btn-primary" 
+                  style={{ width: '100%' }}
+                  disabled={myPlayer.role !== '村人' && !selectedPlayerId}
+                  onClick={handleNightAction}
+                >
+                  アクションを決定する
+                </button>
+              </div>
+            )}
+
+            {myPlayer?.isAlive && room.status === 'voting' && !actionDone && (
+              <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px' }}>
+                <p style={{ marginBottom: '1rem' }}>処刑する相手を選んでください。</p>
+                <button 
+                  className="btn btn-danger" 
+                  style={{ width: '100%' }}
+                  disabled={!selectedPlayerId}
+                  onClick={handleVote}
+                >
+                  投票する
+                </button>
+              </div>
+            )}
+
+            {actionDone && room.status !== 'finished' && (
+              <div style={{ marginTop: '1.5rem', textAlign: 'center', color: '#94a3b8' }}>
+                他のプレイヤーを待っています...
+              </div>
+            )}
+
+            {room.status === 'day' && isHost && (
+              <button className="btn btn-danger" style={{ width: '100%', marginTop: '1.5rem' }} onClick={handleGoToVote}>
+                議論を終了し投票へ進む
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 右側：チャット */}
+        <div style={{ flex: '1 1 400px' }}>
+          <div className="glass-panel" style={{ height: '100%', padding: '1rem' }}>
+            <h3 style={{ margin: '0 0 1rem 0' }}>チャットログ</h3>
+            <div className="chat-container" style={{ marginTop: 0 }}>
+              <div className="chat-messages">
+                {messages.map((msg, idx) => (
+                  <div key={idx} className={`message ${msg.isSystem ? 'system' : msg.sender === myPlayer?.name ? 'me' : ''}`}>
+                    {!msg.isSystem && msg.sender !== myPlayer?.name && (
+                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.25rem' }}>{msg.sender}</div>
+                    )}
+                    {msg.text}
+                  </div>
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
+              {room.status !== 'waiting' && myPlayer?.isAlive && (
+                <form className="chat-input-area" onSubmit={handleSendMessage}>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder={room.status === 'night' ? (myPlayer.role === '人狼' ? "人狼チャット（仲間にのみ見えます）" : "夜は発言できません") : "メッセージを入力..."}
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    disabled={room.status === 'night' && myPlayer.role !== '人狼'}
+                  />
+                  <button type="submit" className="btn btn-primary" disabled={room.status === 'night' && myPlayer.role !== '人狼'}>
+                    <Send size={18} />
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

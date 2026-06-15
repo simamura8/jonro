@@ -270,3 +270,34 @@ h1 {
 .role-knight { background: var(--knight-color); }
 .role-madman { background: var(--madman-color); }
 .role-medium { background: var(--medium-color); }
+
+/* Responsive Design for Mobile Devices */
+@media (max-width: 768px) {
+  .container {
+    padding: 0.5rem; /* スマホではコンテナのパディングを大幅に狭くする */
+  }
+
+  .glass-panel {
+    padding: 1rem; /* スマホではグラスパネルの内部パディングも狭くする */
+    border-radius: 12px;
+  }
+
+  .player-grid {
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); /* スマホではグリッド幅を狭くして収まりやすくする */
+    gap: 0.5rem;
+  }
+
+  .player-card {
+    padding: 0.75rem 0.25rem;
+  }
+
+  h1 {
+    font-size: 2rem;
+  }
+
+  /* チャットコンテナの高さも少し調整してスマホで使いやすくする */
+  .chat-container {
+    height: 300px;
+  }
+}
+

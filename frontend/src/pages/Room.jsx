@@ -261,6 +261,16 @@ export default function Room() {
   const isHost = Object.keys(room.players)[0] === myId;
   const playersList = Object.values(room.players);
 
+  // 自分がアクション（夜のアクションまたは投票）を完了しているか判定
+  const isMyActionDone = actionDone || (
+    room.status === 'night'
+      ? (room.nightActions && room.nightActions[myId] !== undefined)
+      : room.status === 'voting'
+        ? (room.votes && room.votes[myId] !== undefined)
+        : false
+  );
+
+
   const getRoleClass = (role) => {
     switch(role) {
       case '村人': return 'role-villager';
@@ -405,7 +415,7 @@ export default function Room() {
             <div className="player-grid">
               {playersList.map((p) => {
                 const isCandidate = !room.candidates || room.candidates.includes(p.id);
-                const isSelectable = p.isAlive && !actionDone && (
+                const isSelectable = p.isAlive && !isMyActionDone && (
                   room.status === 'night' || (room.status === 'voting' && isCandidate)
                 );
 
@@ -449,7 +459,7 @@ export default function Room() {
             </div>
 
             {/* アクションエリア */}
-            {myPlayer?.isAlive && room.status === 'night' && !actionDone && (
+            {myPlayer?.isAlive && room.status === 'night' && !isMyActionDone && (
               <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
                 <p style={{ marginBottom: '1rem' }}>
                   {myPlayer.role === '村人' ? 'あなたは村人です。夜は何もできません。完了ボタンを押してください。' :
@@ -470,7 +480,7 @@ export default function Room() {
               </div>
             )}
 
-            {myPlayer?.isAlive && room.status === 'voting' && !actionDone && (
+            {myPlayer?.isAlive && room.status === 'voting' && !isMyActionDone && (
               <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px' }}>
                 <p style={{ marginBottom: '1rem' }}>
                   {room.candidates ? '決選投票（再投票）です。候補者から選んでください。' : '処刑する相手を選んでください。'}
@@ -486,7 +496,7 @@ export default function Room() {
               </div>
             )}
 
-            {actionDone && room.status !== 'finished' && (
+            {isMyActionDone && room.status !== 'finished' && (
               <div style={{ marginTop: '1.5rem', textAlign: 'center', color: '#94a3b8' }}>
                 他のプレイヤーを待っています...
               </div>

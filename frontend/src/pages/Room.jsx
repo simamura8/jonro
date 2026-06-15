@@ -39,6 +39,26 @@ export default function Room() {
     }
   }, [location.state]);
 
+  // DBから直接部屋データを取得して初期ロードする
+  useEffect(() => {
+    if (!isNameSet) return;
+
+    const fetchInitialData = async () => {
+      try {
+        const res = await fetch(`/api/room?roomId=${roomId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setRoom(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch initial room data:', err);
+      }
+    };
+
+    fetchInitialData();
+  }, [roomId, isNameSet]);
+
+
   // アクション送信時に HTTP POST API を呼び出す
   const emit = async (type, payload = {}) => {
     try {

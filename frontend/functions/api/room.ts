@@ -39,6 +39,59 @@ function checkWinCondition(roomState: any) {
   return null;
 }
 
+export const onRequestGet: PagesFunction<Env> = async (context) => {
+  try {
+    const { searchParams } = new URL(context.request.url);
+    const roomId = searchParams.get("roomId");
+
+    if (!roomId) {
+      return new Response("Missing roomId", { status: 400 });
+    }
+
+    const db = context.env.DB;
+    const d1Result = await db.prepare("SELECT state FROM rooms WHERE id = ?").bind(roomId).first<{ state: string }>();
+
+    if (!d1Result) {
+      // 初期状態
+      const initialRoomState = {
+        id: roomId,
+        players: {},
+        status: 'waiting',
+        dayCount: 0,
+        logs: [],
+        nightActions: {},
+        votes: {},
+        winner: null,
+        isRevote: false,
+        candidates: null,
+        rolePool: [ROLES.VILLAGER, ROLES.WEREWOLF, ROLES.SEER],
+        lastExecutedId: null
+      };
+      return new Response(JSON.stringify(initialRoomState), {
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*"
+        }
+      });
+    }
+
+    return new Response(d1Result.state, {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      }
+    });
+  } catch (error: any) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      }
+    });
+  }
+};
+
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   try {
     const data = await context.request.json() as any;
@@ -288,10 +341,13 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       });
     }
 
-    // すべてのメッセージを Pusher で送信
-    for (const msg of messagesToBroadcast) {
-      await triggerPusher(pusherConfig, msg.channel, msg.event, msg.payload);
-    }
+    // すべてのメッセージを Pusher で並列送信
+    await Promise.all(
+      messagesToBroadcast.map((msg) =>
+        triggerPusher(pusherConfig, msg.channel, msg.event, msg.payload)
+      )
+    );
+
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" }

@@ -136,8 +136,24 @@ export default function Room() {
       case '人狼': return 'role-werewolf';
       case '占い師': return 'role-seer';
       case '騎士': return 'role-knight';
+      case '狂人': return 'role-madman';
+      case '霊媒師': return 'role-medium';
       default: return '';
     }
+  };
+
+  const handleAddRole = (role) => {
+    socket.emit('update_roles', { roomId, roles: [...room.rolePool, role] });
+  };
+
+  const handleRemoveRole = (indexToRemove) => {
+    const newRoles = room.rolePool.filter((_, idx) => idx !== indexToRemove);
+    socket.emit('update_roles', { roomId, roles: newRoles });
+  };
+
+  const isRoleAddable = (role) => {
+    if (role === '村人' || role === '人狼') return true;
+    return !room.rolePool.includes(role);
   };
 
   return (
@@ -153,14 +169,57 @@ export default function Room() {
         {room.status === 'waiting' && (
           <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '8px' }}>
             <p>参加者を待っています... (現在 {playersList.length} 人)</p>
-            {isHost && playersList.length >= 4 && (
-              <button className="btn btn-primary" style={{ marginTop: '1rem' }} onClick={handleStartGame}>
-                <Play size={18} /> ゲームを開始する
-              </button>
+            
+            <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+              <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem' }}>役職構成 (計 {room.rolePool?.length || 0} 人分)</h3>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+                {room.rolePool?.map((role, idx) => (
+                  <div key={idx} className={`role-badge ${getRoleClass(role)}`} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                    {role}
+                    {isHost && idx >= 3 && (
+                      <span style={{ cursor: 'pointer', fontWeight: 'bold' }} onClick={() => handleRemoveRole(idx)}>×</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              
+              {isHost && (
+                <div>
+                  <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: '#94a3b8' }}>役職を追加：</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    {['村人', '人狼', '占い師', '騎士', '狂人', '霊媒師'].map(role => (
+                      <button 
+                        key={role}
+                        className="btn"
+                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)' }}
+                        disabled={!isRoleAddable(role)}
+                        onClick={() => handleAddRole(role)}
+                      >
+                        + {role}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {isHost && (
+              <div style={{ marginTop: '1.5rem' }}>
+                <button 
+                  className="btn btn-primary" 
+                  disabled={playersList.length !== room.rolePool?.length}
+                  onClick={handleStartGame}
+                >
+                  <Play size={18} /> ゲームを開始する
+                </button>
+                {playersList.length !== room.rolePool?.length && (
+                  <p style={{ color: '#ef4444', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                    ※参加人数（{playersList.length}人）と役職の数（{room.rolePool?.length || 0}人分）を一致させてください。
+                  </p>
+                )}
+              </div>
             )}
-            {isHost && playersList.length < 4 && (
-              <p style={{ color: '#fbbf24', fontSize: '0.9rem', marginTop: '1rem' }}>※開始するには最低4人必要です</p>
-            )}
+            
             {!isHost && (
               <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginTop: '1rem' }}>ホストがゲームを開始するのを待っています...</p>
             )}
@@ -263,6 +322,8 @@ export default function Room() {
               <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
                 <p style={{ marginBottom: '1rem' }}>
                   {myPlayer.role === '村人' ? 'あなたは村人です。夜は何もできません。完了ボタンを押してください。' :
+                   myPlayer.role === '狂人' ? 'あなたは狂人です。人狼に加担しますが、誰が人狼かはわかりません。夜は何もできません。完了ボタンを押してください。' :
+                   myPlayer.role === '霊媒師' ? 'あなたは霊媒師です。処刑されたプレイヤーの正体を知ることができます。夜のアクションはありません。完了ボタンを押してください。' :
                    myPlayer.role === '人狼' ? '襲撃する相手を選んでください。' :
                    myPlayer.role === '占い師' ? '占う相手を選んでください。' :
                    '護衛する相手を選んでください。'}
@@ -270,7 +331,7 @@ export default function Room() {
                 <button 
                   className="btn btn-primary" 
                   style={{ width: '100%' }}
-                  disabled={myPlayer.role !== '村人' && !selectedPlayerId}
+                  disabled={(myPlayer.role !== '村人' && myPlayer.role !== '狂人' && myPlayer.role !== '霊媒師') && !selectedPlayerId}
                   onClick={handleNightAction}
                 >
                   アクションを決定する

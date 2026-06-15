@@ -24,35 +24,20 @@ const ROLES = {
   VILLAGER: '村人',
   WEREWOLF: '人狼',
   SEER: '占い師',
-  KNIGHT: '騎士'
+  KNIGHT: '騎士',
+  MADMAN: '狂人',
+  MEDIUM: '霊媒師'
 };
 
-// 役職の割り当てロジック
-function assignRoles(players) {
+function assignRoles(players, rolePool) {
   const playerIds = Object.keys(players);
-  const count = playerIds.length;
   
-  // デフォルト構成（4人以上を想定）
-  // 4人: 人狼1, 占い師1, 騎士1, 村人1
-  // 5人: 人狼1, 占い師1, 騎士1, 村人2
-  // 6人: 人狼2, 占い師1, 騎士1, 村人2
-  
-  let rolePool = [];
-  if (count <= 4) {
-    rolePool = [ROLES.WEREWOLF, ROLES.SEER, ROLES.KNIGHT];
-    while (rolePool.length < count) rolePool.push(ROLES.VILLAGER);
-  } else if (count === 5) {
-    rolePool = [ROLES.WEREWOLF, ROLES.SEER, ROLES.KNIGHT, ROLES.VILLAGER, ROLES.VILLAGER];
-  } else {
-    rolePool = [ROLES.WEREWOLF, ROLES.WEREWOLF, ROLES.SEER, ROLES.KNIGHT];
-    while (rolePool.length < count) rolePool.push(ROLES.VILLAGER);
-  }
-
   // シャッフル
-  rolePool.sort(() => Math.random() - 0.5);
+  const pool = [...rolePool];
+  pool.sort(() => Math.random() - 0.5);
 
   playerIds.forEach((id, index) => {
-    players[id].role = rolePool[index] || ROLES.VILLAGER;
+    players[id].role = pool[index] || ROLES.VILLAGER;
     players[id].isAlive = true;
   });
 }
@@ -92,7 +77,9 @@ io.on('connection', (socket) => {
         votes: {},
         winner: null,
         isRevote: false,
-        candidates: null
+        candidates: null,
+        rolePool: [ROLES.VILLAGER, ROLES.WEREWOLF, ROLES.SEER], // デフォルトのマスト役職
+        lastExecutedId: null
       };
     }
 
@@ -123,7 +110,7 @@ io.on('connection', (socket) => {
   socket.on('start_game', (roomId) => {
     const room = rooms[roomId];
     if (room && room.status === 'waiting') {
-      assignRoles(room.players);
+      assignRoles(room.players, room.rolePool);
       room.status = 'night';
       room.dayCount = 1;
       room.logs.push('ゲームが開始されました。夜が訪れます...');
@@ -131,6 +118,7 @@ io.on('connection', (socket) => {
       room.votes = {};
       room.isRevote = false;
       room.candidates = null;
+      room.lastExecutedId = null;
 
       io.to(roomId).emit('room_update', room);
       io.to(roomId).emit('chat_message', {
@@ -138,6 +126,14 @@ io.on('connection', (socket) => {
         text: 'ゲーム開始。夜のアクションを行ってください。',
         isSystem: true
       });
+    }
+  });
+
+  socket.on('update_roles', ({ roomId, roles }) => {
+    const room = rooms[roomId];
+    if (room && room.status === 'waiting') {
+      room.rolePool = roles;
+      io.to(roomId).emit('room_update', room);
     }
   });
 
@@ -302,6 +298,7 @@ io.on('connection', (socket) => {
     if (candidates.length === 1) {
       const executedId = candidates[0];
       room.players[executedId].isAlive = false;
+      room.lastExecutedId = executedId;
       io.to(roomId).emit('chat_message', {
         sender: 'System',
         text: `投票の結果、${room.players[executedId].name} が処刑されました。`,
@@ -356,6 +353,26 @@ io.on('connection', (socket) => {
       text: '夜が訪れました。夜のアクションを行ってください。',
       isSystem: true
     });
+
+    // 霊媒師への通知
+    if (room.lastExecutedId) {
+      const executed = room.players[room.lastExecutedId];
+      if (executed) {
+        const isWolf = executed.role === ROLES.WEREWOLF;
+        const resultText = `[霊媒結果] 本日処刑された ${executed.name} は ${isWolf ? '人狼' : '人間'} でした。`;
+        
+        Object.values(room.players).forEach(p => {
+          if (p.isAlive && p.role === ROLES.MEDIUM) {
+            io.to(p.id).emit('chat_message', {
+              sender: 'System',
+              text: resultText,
+              isSystem: true
+            });
+          }
+        });
+      }
+      room.lastExecutedId = null;
+    }
   }
 
   function endGame(roomId, winnerTeam) {
@@ -398,6 +415,7 @@ io.on('connection', (socket) => {
       room.winner = null;
       room.isRevote = false;
       room.candidates = null;
+      room.lastExecutedId = null;
       // プレイヤーの状態をリセット
       Object.values(room.players).forEach(p => {
         p.role = null;

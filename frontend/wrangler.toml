@@ -1,0 +1,9 @@
+name = "werewolf-online"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-06-15"
+compatibility_flags = [ "nodejs_compat" ]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "werewolf-db"
+database_id = "7b7c2c16-535d-47fc-b53d-fe3841e06d9f"

@@ -10,3 +10,10 @@ frontend/dist/
 **/.partykit/
 .partykit
 **/.partykit
+
+# Cloudflare Wrangler & Secrets
+.dev.vars
+.env.production
+.wrangler/
+.env
+*.local

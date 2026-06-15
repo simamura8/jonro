@@ -1,14 +1,26 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import PartySocket from 'partysocket';
+import Pusher from 'pusher-js';
 import { Copy, Play, Send, Moon, Sun, Skull, Trophy } from 'lucide-react';
 
-const PARTY_URL = import.meta.env.VITE_PARTYKIT_HOST || 'localhost:1999';
+// Pusher のキー設定。環境変数から読み込む（なければデフォルトのローカルテスト用キー）
+const PUSHER_KEY = import.meta.env.VITE_PUSHER_KEY || 'werewolf-pusher-key';
+const PUSHER_CLUSTER = import.meta.env.VITE_PUSHER_CLUSTER || 'ap3';
 
 export default function Room() {
   const { roomId } = useParams();
   const navigate = useNavigate();
-  const [socket, setSocket] = useState(null);
+  
+  // 永続的なプレイヤーIDを生成/取得
+  const [myId] = useState(() => {
+    const saved = localStorage.getItem('werewolf_player_id');
+    if (saved) return saved;
+    const newId = Math.random().toString(36).substring(2, 11);
+    localStorage.setItem('werewolf_player_id', newId);
+    return newId;
+  });
+
+  const [pusherInstance, setPusherInstance] = useState(null);
   const [room, setRoom] = useState(null);
   const [messages, setMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
@@ -27,38 +39,90 @@ export default function Room() {
     }
   }, [location.state]);
 
-  const emit = (type, payload) => {
-    if (socket) {
-      socket.send(JSON.stringify({ type, payload }));
+  // アクション送信時に HTTP POST API を呼び出す
+  const emit = async (type, payload = {}) => {
+    try {
+      await fetch('/api/room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomId,
+          playerId: myId,
+          type,
+          payload
+        })
+      });
+    } catch (err) {
+      console.error('API Error:', err);
     }
   };
 
+  // メインの接続・購読設定
   useEffect(() => {
     if (!isNameSet) return;
 
-    const newSocket = new PartySocket({
-      host: PARTY_URL,
-      room: roomId,
-    });
-    setSocket(newSocket);
-
-    newSocket.addEventListener("open", () => {
-      newSocket.send(JSON.stringify({ type: 'join_room', payload: { playerName } }));
-    });
-
-    newSocket.addEventListener("message", (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'room_update') {
-        setRoom(data.payload);
-        setSelectedPlayerId(null);
-        setActionDone(false);
-      } else if (data.type === 'chat_message') {
-        setMessages((prev) => [...prev, data.payload]);
+    // Pusher のインスタンス作成（認証エンドポイントを指定）
+    const pusher = new Pusher(PUSHER_KEY, {
+      cluster: PUSHER_CLUSTER,
+      authEndpoint: '/api/pusher/auth',
+      auth: {
+        params: {
+          name: playerName
+        }
       }
     });
+    setPusherInstance(pusher);
 
-    return () => newSocket.close();
-  }, [roomId, isNameSet, playerName]);
+    // 1. 全員用プレゼンスチャンネルの購読
+    const channel = pusher.subscribe(`presence-room-${roomId}`);
+
+    channel.bind('pusher:subscription_succeeded', () => {
+      // 接続成功したら部屋参加APIを叩く
+      emit('join_room', { playerName });
+    });
+
+    channel.bind('room_update', (data) => {
+      const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+      setRoom(parsedData);
+      setSelectedPlayerId(null);
+      setActionDone(false);
+    });
+
+    channel.bind('chat_message', (data) => {
+      const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+      setMessages((prev) => [...prev, parsedData]);
+    });
+
+    // 2. 自分専用のプライベートチャンネルの購読（占い結果等の個別受信）
+    const userChannel = pusher.subscribe(`private-user-${myId}`);
+    userChannel.bind('chat_message', (data) => {
+      const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+      setMessages((prev) => [...prev, parsedData]);
+    });
+
+    return () => {
+      // 退出時にAPIを叩く
+      emit('leave_room');
+      pusher.disconnect();
+    };
+  }, [roomId, isNameSet, playerName, myId]);
+
+  // 人狼専用チャネルの動的購読
+  useEffect(() => {
+    if (!pusherInstance || !room) return;
+    const myPlayer = room.players[myId];
+    const wolvesChannelName = `private-room-${roomId}-wolves`;
+
+    if (myPlayer?.role === '人狼' && myPlayer.isAlive) {
+      // まだ購読していない場合のみ購読
+      if (!pusherInstance.channel(wolvesChannelName)) {
+        const wolvesChannel = pusherInstance.subscribe(wolvesChannelName);
+        wolvesChannel.bind('chat_message', (data) => {
+          setMessages((prev) => [...prev, data]);
+        });
+      }
+    }
+  }, [room, myId, pusherInstance, roomId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -73,8 +137,49 @@ export default function Room() {
   };
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
-    alert('URLをコピーしました！友達に共有してください。');
+    const url = window.location.href;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url)
+        .then(() => {
+          alert('URLをコピーしました！友達に共有してください。');
+        })
+        .catch((err) => {
+          console.error('Clipboard copy failed:', err);
+          fallbackCopyText(url);
+        });
+    } else {
+      fallbackCopyText(url);
+    }
+  };
+
+  const fallbackCopyText = (text) => {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.width = "2em";
+    textArea.style.height = "2em";
+    textArea.style.padding = "0";
+    textArea.style.border = "none";
+    textArea.style.outline = "none";
+    textArea.style.boxShadow = "none";
+    textArea.style.background = "transparent";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      const successful = document.execCommand('copy');
+      if (successful) {
+        alert('URLをコピーしました！友達に共有してください。');
+      } else {
+        alert('コピーに失敗しました。URLを手動でコピーしてください：' + text);
+      }
+    } catch (err) {
+      console.error('Fallback copy failed:', err);
+      alert('コピーに失敗しました。URLを手動でコピーしてください：' + text);
+    }
+    document.body.removeChild(textArea);
   };
 
   const handleStartGame = () => {
@@ -132,8 +237,8 @@ export default function Room() {
     return <div className="container" style={{ textAlign: 'center', marginTop: '20vh' }}>読み込み中...</div>;
   }
 
-  const myPlayer = room.players[socket?.id];
-  const isHost = Object.keys(room.players)[0] === socket?.id;
+  const myPlayer = room.players[myId];
+  const isHost = Object.keys(room.players)[0] === myId;
   const playersList = Object.values(room.players);
 
   const getRoleClass = (role) => {

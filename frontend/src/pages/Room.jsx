@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { io } from 'socket.io-client';
+import PartySocket from 'partysocket';
 import { Copy, Play, Send, Moon, Sun, Skull, Trophy } from 'lucide-react';
 
-const SOCKET_URL = 'http://localhost:3001';
+const PARTY_URL = import.meta.env.VITE_PARTYKIT_HOST || 'localhost:1999';
 
 export default function Room() {
   const { roomId } = useParams();
@@ -27,28 +27,34 @@ export default function Room() {
     }
   }, [location.state]);
 
+  const emit = (type, payload) => {
+    if (socket) {
+      socket.send(JSON.stringify({ type, payload }));
+    }
+  };
+
   useEffect(() => {
     if (!isNameSet) return;
 
-    const newSocket = io(SOCKET_URL);
+    const newSocket = new PartySocket({
+      host: PARTY_URL,
+      room: roomId,
+    });
     setSocket(newSocket);
 
-    newSocket.emit('join_room', { roomId, playerName });
-
-    newSocket.on('room_update', (updatedRoom) => {
-      setRoom(updatedRoom);
-      // フェーズが変わったら選択やアクション状態をリセット
-      setSelectedPlayerId(null);
-      setActionDone(false);
-      
-      // リセットされたらメッセージもクリアするなどの処理（今回はログを残しても良い）
-      if (updatedRoom.status === 'waiting' && updatedRoom.dayCount === 0) {
-        // 必要ならチャット履歴をクリア: setMessages([]);
-      }
+    newSocket.addEventListener("open", () => {
+      newSocket.send(JSON.stringify({ type: 'join_room', payload: { playerName } }));
     });
 
-    newSocket.on('chat_message', (msg) => {
-      setMessages((prev) => [...prev, msg]);
+    newSocket.addEventListener("message", (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'room_update') {
+        setRoom(data.payload);
+        setSelectedPlayerId(null);
+        setActionDone(false);
+      } else if (data.type === 'chat_message') {
+        setMessages((prev) => [...prev, data.payload]);
+      }
     });
 
     return () => newSocket.close();
@@ -72,32 +78,32 @@ export default function Room() {
   };
 
   const handleStartGame = () => {
-    socket.emit('start_game', roomId);
+    emit('start_game');
   };
 
   const handleRestartGame = () => {
-    socket.emit('restart_game', roomId);
+    emit('restart_game');
   };
 
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
-    socket.emit('send_message', { roomId, text: chatInput });
+    emit('send_message', { text: chatInput });
     setChatInput('');
   };
 
   const handleNightAction = () => {
-    socket.emit('night_action', { roomId, targetId: selectedPlayerId });
+    emit('night_action', { targetId: selectedPlayerId });
     setActionDone(true);
   };
 
   const handleVote = () => {
-    socket.emit('vote', { roomId, targetId: selectedPlayerId });
+    emit('vote', { targetId: selectedPlayerId });
     setActionDone(true);
   };
 
   const handleGoToVote = () => {
-    socket.emit('change_phase', { roomId, phase: 'voting' });
+    emit('change_phase', { phase: 'voting' });
   };
 
   if (!isNameSet) {
@@ -143,12 +149,12 @@ export default function Room() {
   };
 
   const handleAddRole = (role) => {
-    socket.emit('update_roles', { roomId, roles: [...room.rolePool, role] });
+    emit('update_roles', { roles: [...room.rolePool, role] });
   };
 
   const handleRemoveRole = (indexToRemove) => {
     const newRoles = room.rolePool.filter((_, idx) => idx !== indexToRemove);
-    socket.emit('update_roles', { roomId, roles: newRoles });
+    emit('update_roles', { roles: newRoles });
   };
 
   const isRoleAddable = (role) => {

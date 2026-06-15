@@ -1,0 +1,5 @@
+{
+  "name": "werewolf-party",
+  "main": "server.ts",
+  "compatibilityDate": "2024-03-20"
+}

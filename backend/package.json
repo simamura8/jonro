@@ -11,8 +11,6 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
-    "socket.io": "^4.8.3"
+    "partykit": "^0.0.115"
   }
 }

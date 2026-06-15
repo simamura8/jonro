@@ -6,3 +6,7 @@ frontend/dist/
 .DS_Store
 .vscode/
 *.log
+.partykit/
+**/.partykit/
+.partykit
+**/.partykit

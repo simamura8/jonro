@@ -50,6 +50,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     }
 
     const db = context.env.DB;
+    // ローカル開発環境でテーブルが未作成の場合に備えて自動初期化
+    await db.prepare(
+      "CREATE TABLE IF NOT EXISTS rooms (id TEXT PRIMARY KEY, state TEXT NOT NULL, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
+    ).run();
     const d1Result = await db.prepare("SELECT state FROM rooms WHERE id = ?").bind(roomId).first<{ state: string }>();
 
     if (!d1Result) {
@@ -103,6 +107,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     }
 
     const db = context.env.DB;
+    // ローカル開発環境でテーブルが未作成の場合に備えて自動初期化
+    await db.prepare(
+      "CREATE TABLE IF NOT EXISTS rooms (id TEXT PRIMARY KEY, state TEXT NOT NULL, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
+    ).run();
     const pusherConfig = {
       appId: context.env.PUSHER_APP_ID,
       key: context.env.PUSHER_KEY,

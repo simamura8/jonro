@@ -509,8 +509,24 @@ export default function Room() {
               <div className="player-grid">
                 {playersList.map((p) => {
                   const isCandidate = !room.candidates || room.candidates.includes(p.id);
+                  
+                  // 夜のフェーズにおいて特定のプレイヤーを選択不可にするバリデーション
+                  let isNightTargetValid = true;
+                  if (room.status === 'night' && myPlayer) {
+                    // 1. 自分自身を選べない役職 (占い師、怪盗、騎士、人狼)
+                    const cannotSelectSelf = ['占い師', '怪盗', '騎士', '人狼'].includes(myPlayer.role);
+                    if (cannotSelectSelf && p.id === myId) {
+                      isNightTargetValid = false;
+                    }
+                    // 2. 味方の人狼を選べない (人狼)
+                    if (myPlayer.role === '人狼' && p.role === '人狼') {
+                      isNightTargetValid = false;
+                    }
+                  }
+
                   const isSelectable = p.isAlive && !isMyActionDone && (
-                    room.status === 'night' || (room.status === 'voting' && isCandidate)
+                    (room.status === 'night' && isNightTargetValid) ||
+                    (room.status === 'voting' && isCandidate)
                   );
 
                   const isSelected = selectedPlayerId === p.id;
@@ -527,11 +543,16 @@ export default function Room() {
                     ? { boxShadow: '0 0 15px #3b82f6', borderColor: '#3b82f6', transform: 'scale(1.05)', zIndex: 10 }
                     : {};
 
+                  // 夜フェーズで選択不可のプレイヤーカードをグレーアウトするスタイル
+                  const notSelectableNightStyle = room.status === 'night' && !isMyActionDone && !isSelectable
+                    ? { opacity: 0.4, cursor: 'not-allowed' }
+                    : {};
+
                   return (
                     <div 
                       key={p.id} 
                       className={`player-card ${!p.isAlive ? 'dead' : ''} ${isSelected ? 'selected' : ''}`}
-                      style={{ ...notCandidateStyle, ...candidateStyle, ...selectedStyle }}
+                      style={{ ...notCandidateStyle, ...candidateStyle, ...selectedStyle, ...notSelectableNightStyle }}
                       onClick={() => {
                         if (isSelectable) {
                           setSelectedPlayerId(p.id);

@@ -184,3 +184,32 @@ export function tallyVotes(votes: Record<string, string | null>): VoteResult {
     isTie: candidates.length > 1
   };
 }
+
+// ─────────────────────────────────────────────
+// 人狼のロック済みターゲット取得（純粋関数）
+// ─────────────────────────────────────────────
+/**
+ * 人狼が複数いる場合、すでに他の人狼がnaightActionを送信済みであれば
+ * そのターゲットIDを返す。まだ誰も送信していなければ null を返す。
+ * 自分自身のIDを除外して他の人狼のアクションのみを参照する。
+ */
+export function getLockedWolfTarget(
+  nightActions: Record<string, string | null>,
+  players: Record<string, Player>,
+  myId: string
+): string | null {
+  for (const [playerId, targetId] of Object.entries(nightActions)) {
+    // 自分以外の生存している人狼がターゲットを選択済みの場合
+    const player = players[playerId];
+    if (
+      playerId !== myId &&
+      player?.role === ROLES.WEREWOLF &&
+      player.isAlive &&
+      targetId !== null &&
+      targetId !== undefined
+    ) {
+      return targetId;
+    }
+  }
+  return null;
+}

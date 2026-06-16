@@ -3,6 +3,7 @@ import {
   checkWinCondition,
   processNightActions,
   tallyVotes,
+  getLockedWolfTarget,
   ROLES,
   type RoomState,
   type Player,
@@ -659,5 +660,42 @@ describe('tallyVotes — 投票集計', () => {
       expect(result.executedIds).toEqual(['p6']);
       expect(result.isTie).toBe(false);
     });
+  });
+});
+
+// ═════════════════════════════════════════════
+// 6. getLockedWolfTarget のテスト（複数人狼の同期）
+// ═════════════════════════════════════════════
+describe('getLockedWolfTarget()', () => {
+  const players: Record<string, Player> = {
+    wolf1: { role: ROLES.WEREWOLF, isAlive: true, name: 'Wolf 1', id: 'wolf1' },
+    wolf2: { role: ROLES.WEREWOLF, isAlive: true, name: 'Wolf 2', id: 'wolf2' },
+    villager: { role: ROLES.VILLAGER, isAlive: true, name: 'Villager', id: 'villager' },
+    deadWolf: { role: ROLES.WEREWOLF, isAlive: false, name: 'Dead Wolf', id: 'deadWolf' },
+  };
+
+  it('仲間の人狼がすでにターゲットを選択している場合、そのターゲットIDを返す', () => {
+    const nightActions = { wolf1: 'villager' };
+    const target = getLockedWolfTarget(nightActions, players, 'wolf2');
+    expect(target).toBe('villager');
+  });
+
+  it('誰もターゲットを選択していない場合、nullを返す', () => {
+    const nightActions = {};
+    const target = getLockedWolfTarget(nightActions, players, 'wolf1');
+    expect(target).toBeNull();
+  });
+
+  it('自分自身のアクションは無視する', () => {
+    const nightActions = { wolf1: 'villager' };
+    // wolf1自身の視点では、他の仲間はまだ選択していない
+    const target = getLockedWolfTarget(nightActions, players, 'wolf1');
+    expect(target).toBeNull();
+  });
+
+  it('死亡した人狼のアクションは無視する', () => {
+    const nightActions = { deadWolf: 'villager' };
+    const target = getLockedWolfTarget(nightActions, players, 'wolf1');
+    expect(target).toBeNull();
   });
 });

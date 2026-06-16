@@ -522,6 +522,21 @@ export default function Room() {
                     if (myPlayer.role === '人狼' && p.role === '人狼') {
                       isNightTargetValid = false;
                     }
+                    // 3. 人狼が複数いる場合、仲間が選んだターゲット以外は選べない
+                    if (myPlayer.role === '人狼') {
+                      const lockedTarget = (() => {
+                        for (const [pid, tid] of Object.entries(room.nightActions || {})) {
+                          const otherPlayer = room.players[pid];
+                          if (pid !== myId && otherPlayer?.role === '人狼' && otherPlayer.isAlive && tid) {
+                            return tid;
+                          }
+                        }
+                        return null;
+                      })();
+                      if (lockedTarget && p.id !== lockedTarget) {
+                        isNightTargetValid = false;
+                      }
+                    }
                   }
 
                   const isSelectable = p.isAlive && !isMyActionDone && (
@@ -544,15 +559,27 @@ export default function Room() {
                     : {};
 
                   // 夜フェーズで選択不可のプレイヤーカードをグレーアウトするスタイル
-                  const notSelectableNightStyle = room.status === 'night' && !isMyActionDone && !isSelectable
+                  const notSelectableNightStyle = room.status === 'night' && !isMyActionDone && !isSelectable && p.isAlive
                     ? { opacity: 0.4, cursor: 'not-allowed' }
                     : {};
+
+                  // 仲間の人狼がロック済みのターゲットは金色のハイライトを表示
+                  const lockedByTeamStyle = (() => {
+                    if (room.status !== 'night' || myPlayer?.role !== '人狼' || isMyActionDone) return {};
+                    for (const [pid, tid] of Object.entries(room.nightActions || {})) {
+                      const otherPlayer = room.players[pid];
+                      if (pid !== myId && otherPlayer?.role === '人狼' && otherPlayer.isAlive && tid === p.id) {
+                        return { boxShadow: '0 0 12px #ef4444', borderColor: '#ef4444' }; // 赤色で「仲間の選択」を示す
+                      }
+                    }
+                    return {};
+                  })();
 
                   return (
                     <div 
                       key={p.id} 
                       className={`player-card ${!p.isAlive ? 'dead' : ''} ${isSelected ? 'selected' : ''}`}
-                      style={{ ...notCandidateStyle, ...candidateStyle, ...selectedStyle, ...notSelectableNightStyle }}
+                      style={{ ...notCandidateStyle, ...candidateStyle, ...selectedStyle, ...notSelectableNightStyle, ...lockedByTeamStyle }}
                       onClick={() => {
                         if (isSelectable) {
                           setSelectedPlayerId(p.id);

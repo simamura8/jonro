@@ -341,12 +341,12 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       });
     }
 
-    // すべてのメッセージを Pusher で並列送信
-    await Promise.all(
-      messagesToBroadcast.map((msg) =>
-        triggerPusher(pusherConfig, msg.channel, msg.event, msg.payload)
-      )
-    );
+    // すべてのメッセージを順序を担保しつつ Pusher で送信
+    for (const msg of messagesToBroadcast) {
+      await triggerPusher(pusherConfig, msg.channel, msg.event, msg.payload);
+      // Pusher側でのメッセージ到達順序を担保するため、ごくわずかなディレイ(50ms)を挟む
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
 
 
     return new Response(JSON.stringify({ success: true }), {
@@ -449,16 +449,7 @@ async function processVotes(roomState: any, roomId: string, messagesToBroadcast:
   }
 
   if (maxVotes === 0) {
-    messagesToBroadcast.push({
-      channel: `presence-room-${roomId}`,
-      event: 'chat_message',
-      payload: {
-        sender: 'System',
-        text: '投票の結果、誰も処刑されませんでした。',
-        isSystem: true
-      }
-    });
-    goToNextNight(roomState, roomId, messagesToBroadcast);
+    goToNextNight(roomState, roomId, messagesToBroadcast, '投票の結果、誰も処刑されませんでした。');
     return;
   }
 
@@ -466,34 +457,27 @@ async function processVotes(roomState: any, roomId: string, messagesToBroadcast:
     const executedId = candidates[0];
     roomState.players[executedId].isAlive = false;
     roomState.lastExecutedId = executedId;
-    messagesToBroadcast.push({
-      channel: `presence-room-${roomId}`,
-      event: 'chat_message',
-      payload: {
-        sender: 'System',
-        text: `投票の結果、${roomState.players[executedId].name} が処刑されました。`,
-        isSystem: true
-      }
-    });
+    
+    const executionMessage = `投票の結果、${roomState.players[executedId].name} が処刑されました。`;
 
     const winner = checkWinCondition(roomState);
     if (winner) {
-      endGame(roomState, winner, messagesToBroadcast);
-      return;
-    }
-    goToNextNight(roomState, roomId, messagesToBroadcast);
-  } else {
-    if (roomState.isRevote) {
       messagesToBroadcast.push({
         channel: `presence-room-${roomId}`,
         event: 'chat_message',
         payload: {
           sender: 'System',
-          text: `決選投票の結果も同数だったため、誰も処刑されませんでした。`,
+          text: executionMessage,
           isSystem: true
         }
       });
-      goToNextNight(roomState, roomId, messagesToBroadcast);
+      endGame(roomState, winner, messagesToBroadcast);
+      return;
+    }
+    goToNextNight(roomState, roomId, messagesToBroadcast, executionMessage);
+  } else {
+    if (roomState.isRevote) {
+      goToNextNight(roomState, roomId, messagesToBroadcast, '決選投票の結果も同数だったため、誰も処刑されませんでした。');
     } else {
       roomState.isRevote = true;
       roomState.candidates = candidates;
@@ -514,7 +498,7 @@ async function processVotes(roomState: any, roomId: string, messagesToBroadcast:
   }
 }
 
-function goToNextNight(roomState: any, roomId: string, messagesToBroadcast: any[]) {
+function goToNextNight(roomState: any, roomId: string, messagesToBroadcast: any[], executionMessage?: string) {
   roomState.status = 'night';
   roomState.dayCount += 1;
   roomState.votes = {};
@@ -530,6 +514,18 @@ function goToNextNight(roomState: any, roomId: string, messagesToBroadcast: any[
       isSystem: true
     }
   });
+
+  if (executionMessage) {
+    messagesToBroadcast.push({
+      channel: `presence-room-${roomId}`,
+      event: 'chat_message',
+      payload: {
+        sender: 'System',
+        text: executionMessage,
+        isSystem: true
+      }
+    });
+  }
 
   if (roomState.lastExecutedId) {
     const executed = roomState.players[roomState.lastExecutedId];

@@ -317,15 +317,8 @@ export default class WerewolfServer implements PartyServer {
     }
 
     if (maxVotes === 0) {
-      this.room.broadcast(JSON.stringify({
-        type: 'chat_message',
-        payload: {
-          sender: 'System',
-          text: '投票の結果、誰も処刑されませんでした。',
-          isSystem: true
-        }
-      }));
-      this.goToNextNight();
+    if (maxVotes === 0) {
+      this.goToNextNight('投票の結果、誰も処刑されませんでした。');
       return;
     }
 
@@ -333,32 +326,26 @@ export default class WerewolfServer implements PartyServer {
       const executedId = candidates[0];
       this.roomState.players[executedId].isAlive = false;
       this.roomState.lastExecutedId = executedId;
-      this.room.broadcast(JSON.stringify({
-        type: 'chat_message',
-        payload: {
-          sender: 'System',
-          text: `投票の結果、${this.roomState.players[executedId].name} が処刑されました。`,
-          isSystem: true
-        }
-      }));
+      
+      const executionMessage = `投票の結果、${this.roomState.players[executedId].name} が処刑されました。`;
 
       const winner = checkWinCondition(this.roomState);
       if (winner) {
-        this.endGame(winner);
-        return;
-      }
-      this.goToNextNight();
-    } else {
-      if (this.roomState.isRevote) {
         this.room.broadcast(JSON.stringify({
           type: 'chat_message',
           payload: {
             sender: 'System',
-            text: `決選投票の結果も同数だったため、誰も処刑されませんでした。`,
+            text: executionMessage,
             isSystem: true
           }
         }));
-        this.goToNextNight();
+        this.endGame(winner);
+        return;
+      }
+      this.goToNextNight(executionMessage);
+    } else {
+      if (this.roomState.isRevote) {
+        this.goToNextNight('決選投票の結果も同数だったため、誰も処刑されませんでした。');
       } else {
         this.roomState.isRevote = true;
         this.roomState.candidates = candidates;
@@ -379,7 +366,7 @@ export default class WerewolfServer implements PartyServer {
     }
   }
 
-  goToNextNight() {
+  goToNextNight(executionMessage?: string) {
     this.roomState.status = 'night';
     this.roomState.dayCount += 1;
     this.roomState.votes = {};
@@ -395,6 +382,17 @@ export default class WerewolfServer implements PartyServer {
         isSystem: true
       }
     }));
+
+    if (executionMessage) {
+      this.room.broadcast(JSON.stringify({
+        type: 'chat_message',
+        payload: {
+          sender: 'System',
+          text: executionMessage,
+          isSystem: true
+        }
+      }));
+    }
 
     if (this.roomState.lastExecutedId) {
       const executed = this.roomState.players[this.roomState.lastExecutedId];

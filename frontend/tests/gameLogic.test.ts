@@ -263,6 +263,29 @@ describe('processNightActions — 夜フェーズ処理', () => {
       expect(killedPlayerName).toBe('アリス');
       expect(updatedState.players['a'].isAlive).toBe(false);
     });
+
+    it('人狼が自分自身を襲撃対象に選んだ場合 → 襲撃無効（誰も死なない）', () => {
+      const room = makeRoom(
+        [p('w', '人狼', ROLES.WEREWOLF), p('a', 'アリス', ROLES.VILLAGER)],
+        { w: 'w' } // 自分を襲撃
+      );
+      const { killedPlayerName, updatedState } = processNightActions(room);
+      expect(killedPlayerName).toBeNull();
+      expect(updatedState.players['w'].isAlive).toBe(true);
+    });
+
+    it('人狼Aが味方の人狼Bを襲撃対象に選んだ場合 → 襲撃無効（誰も死なない）', () => {
+      const room = makeRoom(
+        [
+          p('w1', '人狼A', ROLES.WEREWOLF),
+          p('w2', '人狼B', ROLES.WEREWOLF),
+          p('a', 'アリス', ROLES.VILLAGER),
+        ],
+        { w1: 'w2', w2: 'a' } // w1がw2（味方）を、w2がアリスを狙う（不一致扱い）
+      );
+      const { killedPlayerName } = processNightActions(room);
+      expect(killedPlayerName).toBeNull();
+    });
   });
 
   // ─── 騎士の護衛 ────────────────────────
@@ -298,6 +321,16 @@ describe('processNightActions — 夜フェーズ処理', () => {
       // 護衛に関するメッセージは出ない
       const knightMsg = messages.find(m => m.text.includes('護衛'));
       expect(knightMsg).toBeUndefined();
+    });
+
+    it('騎士が自分自身を護衛 → 護衛無効（人狼に狙われたら死亡する）', () => {
+      const room = makeRoom(
+        [p('w', '人狼', ROLES.WEREWOLF), p('k', '騎士', ROLES.KNIGHT)],
+        { w: 'k', k: 'k' } // 人狼が騎士を狙い、騎士が自分自身を護衛
+      );
+      const { killedPlayerName, updatedState } = processNightActions(room);
+      expect(killedPlayerName).toBe('騎士');
+      expect(updatedState.players['k'].isAlive).toBe(false); // 護衛無効で死亡
     });
   });
 
@@ -361,6 +394,16 @@ describe('processNightActions — 夜フェーズ処理', () => {
 
       const seerMsg = messages.find(m => m.channel === 'private-user-s' && m.text.includes('占い'));
       expect(seerMsg).toBeUndefined();
+    });
+
+    it('占い師が自分自身を占う → 占い無効（結果メッセージが届かない）', () => {
+      const room = makeRoom(
+        [p('s', '占い師', ROLES.SEER), p('w', '人狼', ROLES.WEREWOLF)],
+        { s: 's', w: 'w' } // 占い師が自分自身を占う
+      );
+      const { messages } = processNightActions(room);
+      const seerMsg = messages.find(m => m.channel === 'private-user-s' && m.text.includes('占い'));
+      expect(seerMsg).toBeUndefined(); // メッセージなし
     });
   });
 
@@ -477,6 +520,17 @@ describe('processNightActions — 夜フェーズ処理', () => {
 
       // 元々の人狼 'w' のアクションで アリスが死ぬ
       expect(killedPlayerName).toBe('アリス');
+    });
+
+    it('怪盗が自分自身から奪う → 奪うアクション無効（役職は怪盗のまま）', () => {
+      const room = makeRoom(
+        [p('t', '怪盗', ROLES.PHANTOM_THIEF), p('w', '人狼', ROLES.WEREWOLF)],
+        { t: 't' } // 怪盗が自分自身を指名
+      );
+      const { updatedState, messages } = processNightActions(room);
+      expect(updatedState.players['t'].role).toBe(ROLES.PHANTOM_THIEF); // 変わらない
+      const thiefMsg = messages.find(m => m.channel === 'private-user-t' && m.text.includes('奪いました'));
+      expect(thiefMsg).toBeUndefined(); // メッセージも届かない
     });
   });
 

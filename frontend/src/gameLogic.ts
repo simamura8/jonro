@@ -72,14 +72,17 @@ export function processNightActions(roomState: RoomState): NightResult {
   // 2. 怪盗の処理（1日目のみ）
   for (const [playerId, targetId] of Object.entries(state.nightActions)) {
     if (originalRoles[playerId] === ROLES.PHANTOM_THIEF && targetId && state.dayCount === 1) {
-      const thief = state.players[playerId];
-      const target = state.players[targetId];
-      if (thief && target) {
-        const stolenRole = target.role!;
-        thief.role = stolenRole;
-        target.role = ROLES.PHANTOM_THIEF;
-        messages.push({ channel: `private-user-${playerId}`, text: `[怪盗] ${target.name} の役職（${stolenRole}）を奪いました。`, isSystem: true });
-        messages.push({ channel: `private-user-${targetId}`, text: `[システム] 怪盗に役職を奪われました。`, isSystem: true });
+      // 自分自身からは奪えない
+      if (targetId !== playerId) {
+        const thief = state.players[playerId];
+        const target = state.players[targetId];
+        if (thief && target) {
+          const stolenRole = target.role!;
+          thief.role = stolenRole;
+          target.role = ROLES.PHANTOM_THIEF;
+          messages.push({ channel: `private-user-${playerId}`, text: `[怪盗] ${target.name} の役職（${stolenRole}）を奪いました。`, isSystem: true });
+          messages.push({ channel: `private-user-${targetId}`, text: `[システム] 怪盗に役職を奪われました。`, isSystem: true });
+        }
       }
       break;
     }
@@ -99,15 +102,25 @@ export function processNightActions(roomState: RoomState): NightResult {
     if (originalRole === ROLES.WEREWOLF && targetId) {
       // 生存している人狼からのアクションのみを採用
       if (state.players[playerId]?.isAlive) {
-        wolfTargets.push(targetId);
+        // 自分自身と、味方の人狼（夜開始時点の役職）への襲撃は無効
+        const isTargetWolf = originalRoles[targetId] === ROLES.WEREWOLF;
+        if (targetId !== playerId && !isTargetWolf) {
+          wolfTargets.push(targetId);
+        }
       }
     } else if (originalRole === ROLES.KNIGHT && targetId) {
-      knightTarget = targetId;
+      // 自分自身への護衛は無効
+      if (targetId !== playerId) {
+        knightTarget = targetId;
+      }
     } else if (originalRole === ROLES.SEER && targetId) {
-      const target = state.players[targetId];
-      if (target) {
-        const result = target.role === ROLES.WEREWOLF ? '人狼' : '人間';
-        messages.push({ channel: `private-user-${playerId}`, text: `[占い結果] ${target.name} は ${result} です。`, isSystem: true });
+      // 自分自身への占いは無効
+      if (targetId !== playerId) {
+        const target = state.players[targetId];
+        if (target) {
+          const result = target.role === ROLES.WEREWOLF ? '人狼' : '人間';
+          messages.push({ channel: `private-user-${playerId}`, text: `[占い結果] ${target.name} は ${result} です。`, isSystem: true });
+        }
       }
     }
   }

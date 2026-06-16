@@ -199,6 +199,33 @@ export default function Room() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // 人狼の複数同期：他の人狼がすでに選んでいるターゲットを特定
+  const lockedWolfTarget = useMemo(() => {
+    if (room?.status !== 'night' || room?.players?.[myId]?.role !== '人狼') return null;
+    for (const [pid, tid] of Object.entries(room.nightActions || {})) {
+      const otherPlayer = room.players[pid];
+      if (pid !== myId && otherPlayer?.role === '人狼' && otherPlayer.isAlive && tid) {
+        return tid;
+      }
+    }
+    return null;
+  }, [room?.status, room?.nightActions, room?.players, myId]);
+
+  // ロックされたターゲットがあれば強制的に選択状態にする
+  const isMyActionDone = actionDone || (
+    room?.status === 'night'
+      ? (room.nightActions && room.nightActions[myId] !== undefined)
+      : room?.status === 'voting'
+        ? (room.votes && room.votes[myId] !== undefined)
+        : false
+  );
+
+  useEffect(() => {
+    if (lockedWolfTarget && selectedPlayerId !== lockedWolfTarget && !isMyActionDone) {
+      setSelectedPlayerId(lockedWolfTarget);
+    }
+  }, [lockedWolfTarget, selectedPlayerId, isMyActionDone]);
+
   const handleJoinRoom = () => {
     if (!playerName.trim()) {
       alert('名前を入力してください');
@@ -523,19 +550,8 @@ export default function Room() {
                       isNightTargetValid = false;
                     }
                     // 3. 人狼が複数いる場合、仲間が選んだターゲット以外は選べない
-                    if (myPlayer.role === '人狼') {
-                      const lockedTarget = (() => {
-                        for (const [pid, tid] of Object.entries(room.nightActions || {})) {
-                          const otherPlayer = room.players[pid];
-                          if (pid !== myId && otherPlayer?.role === '人狼' && otherPlayer.isAlive && tid) {
-                            return tid;
-                          }
-                        }
-                        return null;
-                      })();
-                      if (lockedTarget && p.id !== lockedTarget) {
-                        isNightTargetValid = false;
-                      }
+                    if (myPlayer.role === '人狼' && lockedWolfTarget && p.id !== lockedWolfTarget) {
+                      isNightTargetValid = false;
                     }
                   }
 
@@ -564,16 +580,9 @@ export default function Room() {
                     : {};
 
                   // 仲間の人狼がロック済みのターゲットは金色のハイライトを表示
-                  const lockedByTeamStyle = (() => {
-                    if (room.status !== 'night' || myPlayer?.role !== '人狼' || isMyActionDone) return {};
-                    for (const [pid, tid] of Object.entries(room.nightActions || {})) {
-                      const otherPlayer = room.players[pid];
-                      if (pid !== myId && otherPlayer?.role === '人狼' && otherPlayer.isAlive && tid === p.id) {
-                        return { boxShadow: '0 0 12px #ef4444', borderColor: '#ef4444' }; // 赤色で「仲間の選択」を示す
-                      }
-                    }
-                    return {};
-                  })();
+                  const lockedByTeamStyle = (room.status === 'night' && myPlayer?.role === '人狼' && !isMyActionDone && lockedWolfTarget === p.id)
+                    ? { boxShadow: '0 0 12px #ef4444', borderColor: '#ef4444' } // 赤色で「仲間の選択」を示す
+                    : {};
 
                   return (
                     <div 

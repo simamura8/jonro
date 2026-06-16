@@ -260,6 +260,24 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         const player = roomState.players[playerId];
         if (!player || !player.isAlive) return new Response("Player unauthorized or dead", { status: 403 });
 
+        // 人狼の複数同期検証（サーバーサイド）
+        if (player.role === ROLES.WEREWOLF) {
+          let lockedTarget = null;
+          for (const [pid, tid] of Object.entries(roomState.nightActions || {})) {
+            const otherPlayer = roomState.players[pid] as any;
+            if (pid !== playerId && otherPlayer?.role === ROLES.WEREWOLF && otherPlayer.isAlive && tid) {
+              lockedTarget = tid;
+              break;
+            }
+          }
+          if (lockedTarget && payload.targetId !== lockedTarget) {
+            return new Response(JSON.stringify({ error: "仲間の人狼とターゲットを合わせる必要があります。" }), {
+              status: 400,
+              headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+            });
+          }
+        }
+
         roomState.nightActions[playerId] = payload.targetId;
 
         const aliveCount = Object.values(roomState.players).filter((p: any) => p.isAlive).length;

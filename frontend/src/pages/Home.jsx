@@ -16,10 +16,10 @@ export default function Home() {
   };
 
   return (
-    <div className="glass-panel" style={{ maxWidth: '400px', margin: '10vh auto', textAlign: 'center' }}>
-      <Moon size={64} color="#a78bfa" style={{ marginBottom: '1rem', display: 'inline-block' }} />
+    <div className="glass-panel" style={{ maxWidth: '400px', margin: '5vh auto', textAlign: 'center' }}>
+      <Moon size={48} color="#a78bfa" style={{ marginBottom: '0.5rem', display: 'inline-block' }} />
       <h1>人狼 ONLINE</h1>
-      <p style={{ marginBottom: '2rem', color: '#94a3b8' }}>友達とブラウザで遊べるリアルタイム人狼</p>
+      <p style={{ marginBottom: '1.5rem', color: '#94a3b8' }}>友達とブラウザで遊べるリアルタイム人狼</p>
       
       <input 
         type="text" 
@@ -30,9 +30,23 @@ export default function Home() {
         maxLength={10}
       />
       
-      <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleCreateRoom}>
+      <button className="btn btn-primary" style={{ width: '100%', marginTop: '0.5rem', marginBottom: '1.5rem' }} onClick={handleCreateRoom}>
         ルームを作成する
       </button>
+
+      <div style={{ margin: '0 auto', display: 'flex', justifyContent: 'center' }}>
+        <img 
+          src="/wolf-girl.png" 
+          alt="人狼少女" 
+          style={{ 
+            width: '320px', 
+            height: 'auto', 
+            display: 'block',
+            borderRadius: '12px',
+            filter: 'drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4))'
+          }} 
+        />
+      </div>
     </div>
   );
 }

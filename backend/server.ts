@@ -372,7 +372,6 @@ export default class WerewolfServer implements PartyServer {
     }
 
     if (maxVotes === 0) {
-    if (maxVotes === 0) {
       this.goToNextNight('投票の結果、誰も処刑されませんでした。');
       return;
     }

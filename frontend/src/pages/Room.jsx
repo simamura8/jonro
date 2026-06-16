@@ -187,6 +187,11 @@ export default function Room() {
           setMessages((prev) => [...prev, data]);
         });
       }
+    } else {
+      // 人狼でない、または死亡した場合は購読を解除する
+      if (pusherInstance.channel(wolvesChannelName)) {
+        pusherInstance.unsubscribe(wolvesChannelName);
+      }
     }
   }, [room, myId, pusherInstance, roomId]);
 

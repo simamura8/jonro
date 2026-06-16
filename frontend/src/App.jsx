@@ -4,12 +4,14 @@ import Room from './pages/Room';
 
 function App() {
   return (
-    <div className="container">
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/room/:roomId" element={<Room />} />
-      </Routes>
-    </div>
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/room/:roomId" element={
+        <div className="container">
+          <Room />
+        </div>
+      } />
+    </Routes>
   );
 }
 

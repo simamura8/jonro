@@ -1,0 +1,445 @@
+
+/* =====================================================
+   TITLE SCREEN — Full-Image Immersive Design
+   =====================================================
+   wolf-girl.png を全画面背景に使い、
+   画像の世界観（夜の森・ランタン・月・星）を最大限活かす
+   ===================================================== */
+
+/* ── ページ全体を覆うラッパー ── */
+.tt-root {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+  z-index: 200;
+}
+
+/* ── 背景画像レイヤー ── */
+.tt-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url('/wolf-girl.png');
+  background-size: cover;
+  background-position: center 30%;
+  background-repeat: no-repeat;
+  transform: scale(1.04);
+  animation: tt-bgFloat 12s ease-in-out infinite alternate;
+}
+
+/* ── オーバーレイ：上下を暗くしてテキストを読みやすく ── */
+.tt-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    /* 上部を暗くしてタイトルを際立たせる */
+    linear-gradient(180deg,
+      rgba(2, 6, 23, 0.82) 0%,
+      rgba(2, 6, 23, 0.3)  30%,
+      rgba(2, 6, 23, 0.0)  55%,
+      rgba(2, 6, 23, 0.45) 80%,
+      rgba(2, 6, 23, 0.88) 100%
+    ),
+    /* 周囲をぼかすビネット */
+    radial-gradient(ellipse 90% 90% at 50% 50%,
+      transparent 40%,
+      rgba(2, 6, 23, 0.55) 100%
+    );
+}
+
+/* ── ホタル / 星パーティクル ── */
+.tt-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.tt-particle {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fef3c7, #fbbf24, transparent);
+  animation: tt-particleDrift linear infinite;
+  opacity: 0;
+}
+
+/* ── メインコンテンツ（上部タイトル + 下部ボタン） ── */
+.tt-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5vh 2rem 6vh;
+  text-align: center;
+}
+
+/* ── 上部：ゲームタイトル ── */
+.tt-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  animation: tt-slideDown 1s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+}
+
+.tt-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  padding: 0.3rem 1rem;
+  border-radius: 100px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.15);
+}
+
+.tt-title-jp {
+  font-size: clamp(2.4rem, 7vw, 5.5rem);
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.01em;
+  color: #fff;
+  text-shadow:
+    0 0 40px rgba(251, 191, 36, 0.5),
+    0 0 80px rgba(251, 191, 36, 0.25),
+    0 4px 20px rgba(0, 0, 0, 0.8);
+  font-family: 'Noto Sans JP', sans-serif;
+}
+
+.tt-title-en {
+  display: block;
+  font-size: clamp(3.5rem, 11vw, 9rem);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 0.9;
+  background: linear-gradient(135deg,
+    #fbbf24 0%,
+    #fef3c7 30%,
+    #f59e0b 50%,
+    #fffbeb 70%,
+    #fbbf24 100%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: tt-shimmer 4s ease-in-out infinite;
+  filter: drop-shadow(0 0 30px rgba(251, 191, 36, 0.5));
+  font-family: 'Inter', sans-serif;
+}
+
+.tt-tagline {
+  font-size: clamp(0.85rem, 2vw, 1.1rem);
+  color: rgba(226, 232, 240, 0.85);
+  letter-spacing: 0.18em;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
+  font-weight: 400;
+  margin-top: 0.4rem;
+}
+
+/* ── 下部：クリックToStart ── */
+.tt-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  animation: tt-slideUp 1s cubic-bezier(0.22, 1, 0.36, 1) 0.4s both;
+}
+
+.tt-cta {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.9rem;
+  font-size: clamp(1rem, 3vw, 1.35rem);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #fff;
+  padding: 1rem 3rem;
+  border-radius: 100px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg,
+    rgba(180, 83, 9, 0.6) 0%,
+    rgba(217, 119, 6, 0.7) 40%,
+    rgba(180, 83, 9, 0.6) 100%);
+  backdrop-filter: blur(16px);
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.5),
+    0 0 30px rgba(251, 191, 36, 0.25),
+    0 8px 40px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  animation: tt-ctaGlow 2.5s ease-in-out infinite;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  font-family: 'Noto Sans JP', sans-serif;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.tt-cta:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow:
+    0 0 0 1px rgba(251, 191, 36, 0.8),
+    0 0 50px rgba(251, 191, 36, 0.5),
+    0 16px 48px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.tt-cta-lantern {
+  font-size: 1.3em;
+  animation: tt-lanternSway 2.5s ease-in-out infinite;
+  display: inline-block;
+}
+
+.tt-cta-lantern:last-child {
+  animation-delay: 0.3s;
+}
+
+.tt-hint {
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.55);
+  animation: tt-blink 2.5s ease-in-out infinite;
+}
+
+/* ── フェードアウト遷移 ── */
+.tt-root.tt-exit {
+  animation: tt-exit 0.8s ease-in forwards;
+  pointer-events: none;
+}
+
+/* ─────────────────────────────────────────
+   名前入力フォーム画面
+───────────────────────────────────────── */
+.tf-root {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  opacity: 0;
+  animation: tf-enter 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.05s forwards;
+}
+
+/* 背景は同じ画像を暗くしてぼかす */
+.tf-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url('/wolf-girl.png');
+  background-size: cover;
+  background-position: center 30%;
+  filter: blur(6px) brightness(0.3) saturate(1.5);
+  transform: scale(1.06);
+}
+
+/* 追加の暗オーバーレイ */
+.tf-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.55);
+}
+
+/* カード本体 */
+.tf-card {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 420px;
+  margin: 1rem;
+  background: linear-gradient(145deg,
+    rgba(8, 15, 35, 0.88) 0%,
+    rgba(15, 25, 55, 0.92) 100%);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  border-radius: 28px;
+  padding: 2.5rem 2rem;
+  backdrop-filter: blur(24px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 32px 80px rgba(0, 0, 0, 0.6),
+    0 0 60px rgba(251, 191, 36, 0.08);
+  text-align: center;
+}
+
+/* カード内の小さい狼少女 */
+.tf-char {
+  width: 130px;
+  height: auto;
+  display: block;
+  margin: 0 auto 1.2rem;
+  filter: drop-shadow(0 8px 24px rgba(251, 191, 36, 0.3));
+  animation: tt-floatChar 5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.tf-title {
+  font-size: 1.9rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #fbbf24 0%, #f8fafc 50%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 0.3rem;
+  font-family: 'Noto Sans JP', 'Inter', sans-serif;
+}
+
+.tf-sub {
+  font-size: 0.82rem;
+  color: rgba(148, 163, 184, 0.75);
+  margin-bottom: 1.8rem;
+  letter-spacing: 0.05em;
+}
+
+.tf-label {
+  display: block;
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(251, 191, 36, 0.85);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+.tf-input {
+  width: 100%;
+  padding: 0.9rem 1.2rem;
+  border-radius: 12px;
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 1.05rem;
+  font-family: 'Noto Sans JP', 'Inter', sans-serif;
+  margin-bottom: 1rem;
+  transition: border-color 0.25s, box-shadow 0.25s;
+  outline: none;
+}
+
+.tf-input::placeholder {
+  color: rgba(148, 163, 184, 0.5);
+}
+
+.tf-input:focus {
+  border-color: rgba(251, 191, 36, 0.65);
+  box-shadow:
+    0 0 0 3px rgba(251, 191, 36, 0.12),
+    0 0 20px rgba(251, 191, 36, 0.1);
+}
+
+.tf-btn {
+  width: 100%;
+  padding: 1rem;
+  border: none;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  font-family: 'Noto Sans JP', 'Inter', sans-serif;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  background: linear-gradient(135deg, #b45309 0%, #d97706 50%, #f59e0b 100%);
+  color: #1c1000;
+  box-shadow:
+    0 4px 20px rgba(251, 191, 36, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: all 0.25s ease;
+}
+
+.tf-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #d97706 0%, #f59e0b 50%, #fbbf24 100%);
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 30px rgba(251, 191, 36, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.tf-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ─────────────────────────────────────────
+   Keyframe Animations
+───────────────────────────────────────── */
+@keyframes tt-bgFloat {
+  0%   { transform: scale(1.04) translate(0px,  0px); }
+  100% { transform: scale(1.08) translate(-8px, -6px); }
+}
+
+@keyframes tt-shimmer {
+  0%   { background-position: 200% 0%; }
+  100% { background-position: -200% 0%; }
+}
+
+@keyframes tt-slideDown {
+  from { opacity: 0; transform: translateY(-40px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes tt-slideUp {
+  from { opacity: 0; transform: translateY(40px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes tt-ctaGlow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(251, 191, 36, 0.5),
+      0 0 20px rgba(251, 191, 36, 0.2),
+      0 8px 40px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(251, 191, 36, 0.75),
+      0 0 50px rgba(251, 191, 36, 0.45),
+      0 8px 40px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+}
+
+@keyframes tt-lanternSway {
+  0%, 100% { transform: rotate(-10deg) scale(1.0); }
+  50%       { transform: rotate(10deg)  scale(1.1); }
+}
+
+@keyframes tt-blink {
+  0%, 100% { opacity: 0.35; }
+  50%       { opacity: 0.85; }
+}
+
+@keyframes tt-particleDrift {
+  0%   { transform: translate(0, 0) scale(0);   opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 0.7; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 0; }
+}
+
+@keyframes tt-exit {
+  0%   { opacity: 1; transform: scale(1) blur(0); filter: blur(0px); }
+  100% { opacity: 0; transform: scale(1.05);       filter: blur(8px); }
+}
+
+@keyframes tf-enter {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes tt-floatChar {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-10px); }
+}
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .tt-cta { padding: 0.85rem 2.2rem; }
+  .tf-card { padding: 2rem 1.4rem; border-radius: 20px; }
+  .tf-char { width: 100px; }
+}

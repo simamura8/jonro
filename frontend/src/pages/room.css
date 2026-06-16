@@ -1,0 +1,357 @@
+/* =====================================================
+   GAME ROOM SCREEN — Immersive Dark Fantasy & Gold
+   ===================================================== */
+
+/* ── ルーム全体の背景設定 ── */
+.tr-root {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+  color: #f8fafc;
+  overflow-x: hidden;
+  font-family: 'Noto Sans JP', 'Inter', sans-serif;
+}
+
+/* 背景画像レイヤー（暗くぼかして文字を読みやすく） */
+.tr-bg {
+  position: fixed;
+  inset: 0;
+  background-image: url('/wolf-girl.png');
+  background-size: cover;
+  background-position: center 30%;
+  filter: blur(8px) brightness(0.22) saturate(1.2);
+  transform: scale(1.05);
+  z-index: -2;
+}
+
+/* 追加のオーバーレイ */
+.tr-overlay {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(2, 6, 23, 0.4) 0%, rgba(2, 6, 23, 0.85) 100%);
+  z-index: -1;
+}
+
+/* ── ホタルパーティクル ── */
+.tr-particles {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.tr-particle {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(254, 243, 199, 0.8), rgba(251, 191, 36, 0.4), transparent);
+  animation: tr-particleDrift linear infinite;
+  opacity: 0;
+}
+
+@keyframes tr-particleDrift {
+  0%   { transform: translate(0, 0) scale(0); opacity: 0; }
+  15%  { opacity: 0.8; }
+  85%  { opacity: 0.6; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 0; }
+}
+
+/* ── グラスモーフィズムパネルの再定義 ── */
+.tr-root .glass-panel {
+  background: linear-gradient(135deg, rgba(20, 35, 72, 0.88) 0%, rgba(12, 22, 48, 0.93) 100%);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  border-radius: 20px;
+  padding: 1.5rem;
+  backdrop-filter: blur(24px);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 40px rgba(251, 191, 36, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  position: relative;
+  z-index: 5;
+}
+
+/* ── 見出しデザイン ── */
+.tr-root h2, .tr-root h3 {
+  font-family: 'Noto Sans JP', sans-serif;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: #fff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  margin-top: 0;
+}
+
+.tr-root h2 {
+  font-size: 1.6rem;
+  color: #fff;
+}
+
+.tr-root h3 {
+  font-size: 1.25rem;
+  border-bottom: 1px solid rgba(251, 191, 36, 0.15);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1.2rem;
+  color: #fef3c7;
+}
+
+/* ── ボタンデザインの統一 ── */
+.tr-root .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  padding: 0.65rem 1.5rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+  font-family: 'Noto Sans JP', sans-serif;
+}
+
+.tr-root .btn-primary {
+  background-color: #d97706; /* 以前のゲームデザインと馴染む落ち着いたアンバー色 */
+  color: #fff;
+}
+
+.tr-root .btn-primary:hover:not(:disabled) {
+  background-color: #b45309;
+}
+
+.tr-root .btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tr-root .btn-danger {
+  background-color: #ef4444;
+  color: #fff;
+}
+
+.tr-root .btn-danger:hover:not(:disabled) {
+  background-color: #dc2626;
+}
+
+/* ── インプットフィールド ── */
+.tr-root .input-field {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  font-family: 'Noto Sans JP', sans-serif;
+  transition: all 0.25s;
+  outline: none;
+}
+
+.tr-root .input-field:focus {
+  border-color: rgba(251, 191, 36, 0.6);
+  box-shadow: 
+    0 0 0 3px rgba(251, 191, 36, 0.1),
+    0 0 15px rgba(251, 191, 36, 0.08);
+}
+
+/* ── プレイヤーカードグリッド ── */
+.tr-root .player-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.tr-root .player-card {
+  background: rgba(2, 6, 23, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 0.9rem 0.6rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.tr-root .player-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.03);
+}
+
+.tr-root .player-card.selected {
+  border-color: #fbbf24 !important;
+  background: rgba(251, 191, 36, 0.08) !important;
+  box-shadow: 
+    0 0 15px rgba(251, 191, 36, 0.25),
+    inset 0 0 8px rgba(251, 191, 36, 0.15) !important;
+}
+
+.tr-root .player-card.dead {
+  opacity: 0.5;
+  background: rgba(15, 23, 42, 0.6);
+  border-color: rgba(239, 68, 68, 0.25);
+  text-decoration: line-through rgba(239, 68, 68, 0.6);
+}
+
+.tr-root .player-card.dead::after {
+  content: '☠';
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 0.75rem;
+  color: #ef4444;
+}
+
+/* ── 役職バッジ ── */
+.tr-root .role-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  border: 1px solid transparent;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  margin-top: 0.3rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.tr-root .role-villager {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.55);
+  color: #93c5fd;
+}
+
+.tr-root .role-werewolf {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.6);
+  color: #fca5a5;
+  animation: pulse-border 2s infinite;
+}
+
+.tr-root .role-seer {
+  background: rgba(167, 139, 250, 0.15);
+  border-color: rgba(167, 139, 250, 0.55);
+  color: #c084fc;
+}
+
+.tr-root .role-knight {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.55);
+  color: #6ee7b7;
+}
+
+.tr-root .role-madman {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.55);
+  color: #fcd34d;
+}
+
+.tr-root .role-medium {
+  background: rgba(236, 72, 153, 0.15);
+  border-color: rgba(236, 72, 153, 0.55);
+  color: #fbcfe8;
+}
+
+.tr-root .role-thief {
+  background: rgba(20, 184, 166, 0.15);
+  border-color: rgba(20, 184, 166, 0.55);
+  color: #99f6e4;
+}
+
+@keyframes pulse-border {
+  0%, 100% { border-color: rgba(239, 68, 68, 0.6); }
+  50% { border-color: rgba(239, 68, 68, 1); box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
+}
+
+/* ── チャット周りの刷新 ── */
+.tr-root .chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 480px;
+  background: rgba(2, 6, 23, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.tr-root .chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.tr-root .message {
+  max-width: 85%;
+  padding: 0.6rem 0.9rem;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  align-self: flex-start;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: #e2e8f0;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+/* 自分の発言 */
+.tr-root .message.me {
+  align-self: flex-end;
+  background: linear-gradient(135deg, rgba(180, 83, 9, 0.35) 0%, rgba(217, 119, 6, 0.4) 100%);
+  border-color: rgba(251, 191, 36, 0.3);
+  color: #fffefb;
+}
+
+/* システムメッセージ */
+.tr-root .message.system {
+  align-self: center;
+  max-width: 95%;
+  background: rgba(251, 191, 36, 0.05);
+  border: 1px dashed rgba(251, 191, 36, 0.3);
+  color: #fef3c7;
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 0.5rem 1.2rem;
+  border-radius: 8px;
+}
+
+.tr-root .chat-input-area {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tr-root .chat-input-area .input-field {
+  flex: 1;
+}
+
+.tr-root .chat-input-area .btn {
+  padding: 0.6rem 1rem;
+}
+
+/* スクロールバーのカスタマイズ（クローム用） */
+.tr-root .chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tr-root .chat-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tr-root .chat-messages::-webkit-scrollbar-thumb {
+  background: rgba(251, 191, 36, 0.15);
+  border-radius: 10px;
+}
+
+.tr-root .chat-messages::-webkit-scrollbar-thumb:hover {
+  background: rgba(251, 191, 36, 0.35);
+}

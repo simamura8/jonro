@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "npx concurrently \"vite\" \"npx wrangler pages dev --proxy http://localhost:5173 --d1 DB\"",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"

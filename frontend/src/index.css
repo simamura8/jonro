@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+JP:wght@400;700;900&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+JP:wght@400;700;900&display=swap');
 
 :root {
   --bg-color: #0f172a;
@@ -275,16 +275,16 @@ h1 {
 /* Responsive Design for Mobile Devices */
 @media (max-width: 768px) {
   .container {
-    padding: 0.5rem; /* スマホではコンテナのパディングを大幅に狭くする */
+    padding: 0.5rem; /* 繧ｹ繝槭・縺ｧ縺ｯ繧ｳ繝ｳ繝・リ縺ｮ繝代ョ繧｣繝ｳ繧ｰ繧貞､ｧ蟷・↓迢ｭ縺上☆繧・*/
   }
 
   .glass-panel {
-    padding: 1rem; /* スマホではグラスパネルの内部パディングも狭くする */
+    padding: 1rem; /* 繧ｹ繝槭・縺ｧ縺ｯ繧ｰ繝ｩ繧ｹ繝代ロ繝ｫ縺ｮ蜀・Κ繝代ョ繧｣繝ｳ繧ｰ繧ら強縺上☆繧・*/
     border-radius: 12px;
   }
 
   .player-grid {
-    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); /* スマホではグリッド幅を狭くして収まりやすくする */
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); /* 繧ｹ繝槭・縺ｧ縺ｯ繧ｰ繝ｪ繝・ラ蟷・ｒ迢ｭ縺上＠縺ｦ蜿弱∪繧翫ｄ縺吶￥縺吶ｋ */
     gap: 0.5rem;
   }
 
@@ -296,9 +296,8 @@ h1 {
     font-size: 2rem;
   }
 
-  /* チャットコンテナの高さも少し調整してスマホで使いやすくする */
+  /* 繝√Ε繝・ヨ繧ｳ繝ｳ繝・リ縺ｮ鬮倥＆繧ょｰ代＠隱ｿ謨ｴ縺励※繧ｹ繝槭・縺ｧ菴ｿ縺・ｄ縺吶￥縺吶ｋ */
   .chat-container {
     height: 300px;
   }
 }
-

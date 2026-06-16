@@ -18,7 +18,7 @@ export default function Home() {
   return (
     <div className="glass-panel" style={{ maxWidth: '400px', margin: '5vh auto', textAlign: 'center' }}>
       <Moon size={48} color="#a78bfa" style={{ marginBottom: '0.5rem', display: 'inline-block' }} />
-      <h1>人狼 ONLINE</h1>
+      <h1>みんなで人狼ONLINE</h1>
       <p style={{ marginBottom: '1.5rem', color: '#94a3b8' }}>友達とブラウザで遊べるリアルタイム人狼</p>
       
       <input 

@@ -6,7 +6,8 @@ const ROLES = {
   SEER: '占い師',
   KNIGHT: '騎士',
   MADMAN: '狂人',
-  MEDIUM: '霊媒師'
+  MEDIUM: '霊媒師',
+  PHANTOM_THIEF: '怪盗'
 };
 
 function assignRoles(players: any, rolePool: any) {
@@ -239,19 +240,72 @@ export default class WerewolfServer implements PartyServer {
   }
 
   processNightActions() {
+    // 1. 各プレイヤーの元々の役職を記録
+    const originalRoles: Record<string, string> = {};
+    for (const socketId of Object.keys(this.roomState.players)) {
+      originalRoles[socketId] = this.roomState.players[socketId].role;
+    }
+
+    // 2. 先に怪盗の処理を行う
+    let thiefId = null;
+    let thiefTargetId = null;
+
+    for (const [socketId, targetId] of Object.entries(this.roomState.nightActions)) {
+      if (originalRoles[socketId] === ROLES.PHANTOM_THIEF && targetId && this.roomState.dayCount === 1) {
+        thiefId = socketId;
+        thiefTargetId = targetId as string;
+        break;
+      }
+    }
+
+    if (thiefId && thiefTargetId) {
+      const thiefPlayer = this.roomState.players[thiefId];
+      const targetPlayer = this.roomState.players[thiefTargetId];
+      if (thiefPlayer && targetPlayer) {
+        const stolenRole = targetPlayer.role;
+        thiefPlayer.role = stolenRole;
+        targetPlayer.role = ROLES.PHANTOM_THIEF;
+
+        const thiefConn = this.room.getConnection(thiefId);
+        if (thiefConn) {
+          thiefConn.send(JSON.stringify({
+            type: 'chat_message',
+            payload: {
+              sender: 'System',
+              text: `[怪盗] あなたは ${targetPlayer.name} の役職（${stolenRole}）を奪いました。今後は ${stolenRole} として行動します。`,
+              isSystem: true
+            }
+          }));
+        }
+        
+        const targetConn = this.room.getConnection(thiefTargetId);
+        if (targetConn) {
+          targetConn.send(JSON.stringify({
+            type: 'chat_message',
+            payload: {
+              sender: 'System',
+              text: `[システム] あなたは怪盗に役職を奪われました。能力のない「怪盗」になります。`,
+              isSystem: true
+            }
+          }));
+        }
+      }
+    }
+
+    // 3. 他のアクションを処理
     let wolfTarget = null;
     let knightTarget = null;
 
     for (const [socketId, targetId] of Object.entries(this.roomState.nightActions)) {
-      const player = this.roomState.players[socketId];
-      if (!player) continue;
+      const originalRole = originalRoles[socketId];
       
-      if (player.role === ROLES.WEREWOLF && targetId) {
+      if (originalRole === ROLES.WEREWOLF && targetId) {
         wolfTarget = targetId;
-      } else if (player.role === ROLES.KNIGHT && targetId) {
+      } else if (originalRole === ROLES.KNIGHT && targetId) {
         knightTarget = targetId;
-      } else if (player.role === ROLES.SEER && targetId) {
+      } else if (originalRole === ROLES.SEER && targetId) {
         const targetPlayer = this.roomState.players[targetId as string];
+        // ここで参照する targetPlayer.role は怪盗の交換が反映された「現在の」役職
         const result = targetPlayer.role === ROLES.WEREWOLF ? '人狼' : '人間';
         const seerConn = this.room.getConnection(socketId);
         if (seerConn) {
@@ -267,6 +321,7 @@ export default class WerewolfServer implements PartyServer {
       }
     }
 
+    // 4. 襲撃処理
     let killedPlayerName = '誰も死にませんでした';
     if (wolfTarget && wolfTarget !== knightTarget) {
       const victim = this.roomState.players[wolfTarget as string];

@@ -60,7 +60,7 @@ export default function Room() {
 
 
   // アクション送信時に HTTP POST API を呼び出す
-  const emit = async (type, payload = {}) => {
+  const emit = async (type, payload = {}, options = {}) => {
     try {
       await fetch('/api/room', {
         method: 'POST',
@@ -70,12 +70,28 @@ export default function Room() {
           playerId: myId,
           type,
           payload
-        })
+        }),
+        ...options
       });
     } catch (err) {
       console.error('API Error:', err);
     }
   };
+
+  // ブラウザ（タブ）を閉じた際の離脱処理
+  useEffect(() => {
+    if (!isNameSet) return;
+
+    const handleBeforeUnload = () => {
+      // ページ遷移・終了時に確実にリクエストを届けるため keepalive を true にする
+      emit('leave_room', {}, { keepalive: true });
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [roomId, myId, isNameSet]);
 
   // メインの接続・購読設定
   useEffect(() => {
@@ -279,6 +295,7 @@ export default function Room() {
       case '騎士': return 'role-knight';
       case '狂人': return 'role-madman';
       case '霊媒師': return 'role-medium';
+      case '怪盗': return 'role-thief';
       default: return '';
     }
   };
@@ -328,7 +345,7 @@ export default function Room() {
                 <div>
                   <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: '#94a3b8' }}>役職を追加：</p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    {['村人', '人狼', '占い師', '騎士', '狂人', '霊媒師'].map(role => (
+                    {['村人', '人狼', '占い師', '騎士', '狂人', '霊媒師', '怪盗'].map(role => (
                       <button 
                         key={role}
                         className="btn"
@@ -465,6 +482,7 @@ export default function Room() {
                   {myPlayer.role === '村人' ? 'あなたは村人です。夜は何もできません。完了ボタンを押してください。' :
                    myPlayer.role === '狂人' ? 'あなたは狂人です。人狼に加担しますが、誰が人狼かはわかりません。夜は何もできません。完了ボタンを押してください。' :
                    myPlayer.role === '霊媒師' ? 'あなたは霊媒師です。処刑されたプレイヤーの正体を知ることができます。夜のアクションはありません。完了ボタンを押してください。' :
+                   myPlayer.role === '怪盗' ? (room.dayCount === 1 ? 'あなたは怪盗です。役職を奪いたい相手を選んでください。' : 'あなたは怪盗です。夜は何もできません。完了ボタンを押してください。') :
                    myPlayer.role === '人狼' ? '襲撃する相手を選んでください。' :
                    myPlayer.role === '占い師' ? '占う相手を選んでください。' :
                    '護衛する相手を選んでください。'}
@@ -472,7 +490,7 @@ export default function Room() {
                 <button 
                   className="btn btn-primary" 
                   style={{ width: '100%' }}
-                  disabled={(myPlayer.role !== '村人' && myPlayer.role !== '狂人' && myPlayer.role !== '霊媒師') && !selectedPlayerId}
+                  disabled={(myPlayer.role !== '村人' && myPlayer.role !== '狂人' && myPlayer.role !== '霊媒師' && !(myPlayer.role === '怪盗' && room.dayCount > 1)) && !selectedPlayerId}
                   onClick={handleNightAction}
                 >
                   アクションを決定する

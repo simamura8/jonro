@@ -6,7 +6,8 @@ const ROLES = {
   SEER: '占い師',
   KNIGHT: '騎士',
   MADMAN: '狂人',
-  MEDIUM: '霊媒師'
+  MEDIUM: '霊媒師',
+  PHANTOM_THIEF: '怪盗'
 };
 
 interface Env {
@@ -367,22 +368,68 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   }
 };
 
-// 夜のアクションを処理する関数
 async function processNightActions(roomState: any, roomId: string, messagesToBroadcast: any[]) {
+  // 1. 各プレイヤーの元々の役職を記録（アクション判定用）
+  const originalRoles: Record<string, string> = {};
+  for (const playerId of Object.keys(roomState.players)) {
+    originalRoles[playerId] = roomState.players[playerId].role;
+  }
+
+  // 2. 先に怪盗の処理を行う
+  let thiefId = null;
+  let thiefTargetId = null;
+  for (const [playerId, targetId] of Object.entries(roomState.nightActions)) {
+    if (originalRoles[playerId] === ROLES.PHANTOM_THIEF && targetId && roomState.dayCount === 1) {
+      thiefId = playerId;
+      thiefTargetId = targetId as string;
+      break;
+    }
+  }
+
+  if (thiefId && thiefTargetId) {
+    const thiefPlayer = roomState.players[thiefId];
+    const targetPlayer = roomState.players[thiefTargetId];
+    if (thiefPlayer && targetPlayer) {
+      const stolenRole = targetPlayer.role;
+      thiefPlayer.role = stolenRole;
+      targetPlayer.role = ROLES.PHANTOM_THIEF;
+
+      messagesToBroadcast.push({
+        channel: `private-user-${thiefId}`,
+        event: 'chat_message',
+        payload: {
+          sender: 'System',
+          text: `[怪盗] あなたは ${targetPlayer.name} の役職（${stolenRole}）を奪いました。今後は ${stolenRole} として行動します。`,
+          isSystem: true
+        }
+      });
+      messagesToBroadcast.push({
+        channel: `private-user-${thiefTargetId}`,
+        event: 'chat_message',
+        payload: {
+          sender: 'System',
+          text: `[システム] あなたは怪盗に役職を奪われました。能力のない「怪盗」になります。`,
+          isSystem: true
+        }
+      });
+    }
+  }
+
+  // 3. 他のアクションを処理（元々の役職に基づいて判定）
   let wolfTarget = null;
   let knightTarget = null;
 
   for (const [playerId, targetId] of Object.entries(roomState.nightActions)) {
-    const player = roomState.players[playerId];
-    if (!player) continue;
+    const originalRole = originalRoles[playerId];
     
-    if (player.role === ROLES.WEREWOLF && targetId) {
+    if (originalRole === ROLES.WEREWOLF && targetId) {
       wolfTarget = targetId;
-    } else if (player.role === ROLES.KNIGHT && targetId) {
+    } else if (originalRole === ROLES.KNIGHT && targetId) {
       knightTarget = targetId;
-    } else if (player.role === ROLES.SEER && targetId) {
+    } else if (originalRole === ROLES.SEER && targetId) {
       const targetPlayer = roomState.players[targetId as string];
       if (targetPlayer) {
+        // ここで参照する targetPlayer.role は怪盗の交換が反映された「現在の」役職
         const result = targetPlayer.role === ROLES.WEREWOLF ? '人狼' : '人間';
         // 占い師個人のプライベートチャネルに結果を送信
         messagesToBroadcast.push({
@@ -398,6 +445,7 @@ async function processNightActions(roomState: any, roomId: string, messagesToBro
     }
   }
 
+  // 4. 襲撃処理
   let killedPlayerName = '誰も死にませんでした';
   if (wolfTarget && wolfTarget !== knightTarget) {
     const victim = roomState.players[wolfTarget as string];

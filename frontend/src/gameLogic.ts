@@ -86,13 +86,21 @@ export function processNightActions(roomState: RoomState): NightResult {
   }
 
   // 3. 人狼・騎士・占い師の処理
-  let wolfTarget: string | null = null;
   let knightTarget: string | null = null;
+  const wolfTargets: string[] = [];
+
+  // 生存している人狼（アクション権利がある人狼）をリストアップ
+  const activeWolves = Object.values(state.players).filter(
+    (p) => p.role === ROLES.WEREWOLF && p.isAlive
+  );
 
   for (const [playerId, targetId] of Object.entries(state.nightActions)) {
     const originalRole = originalRoles[playerId];
     if (originalRole === ROLES.WEREWOLF && targetId) {
-      wolfTarget = targetId;
+      // 生存している人狼からのアクションのみを採用
+      if (state.players[playerId]?.isAlive) {
+        wolfTargets.push(targetId);
+      }
     } else if (originalRole === ROLES.KNIGHT && targetId) {
       knightTarget = targetId;
     } else if (originalRole === ROLES.SEER && targetId) {
@@ -101,6 +109,16 @@ export function processNightActions(roomState: RoomState): NightResult {
         const result = target.role === ROLES.WEREWOLF ? '人狼' : '人間';
         messages.push({ channel: `private-user-${playerId}`, text: `[占い結果] ${target.name} は ${result} です。`, isSystem: true });
       }
+    }
+  }
+
+  // 襲撃先の判定：
+  // 生存している人狼全員がアクションを送信し、かつそのターゲットが全員一致している場合のみ襲撃成功
+  let wolfTarget: string | null = null;
+  if (activeWolves.length > 0 && wolfTargets.length === activeWolves.length) {
+    const allMatch = wolfTargets.every((val) => val === wolfTargets[0]);
+    if (allMatch) {
+      wolfTarget = wolfTargets[0];
     }
   }
 

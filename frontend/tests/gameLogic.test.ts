@@ -205,6 +205,64 @@ describe('processNightActions — 夜フェーズ処理', () => {
       // 元のStateのアリスはまだ生存しているはず
       expect(room.players['a'].isAlive).toBe(true);
     });
+
+    it('人狼が2人いて、同じ人を襲撃する → その人が死亡する', () => {
+      const room = makeRoom(
+        [
+          p('w1', '人狼A', ROLES.WEREWOLF),
+          p('w2', '人狼B', ROLES.WEREWOLF),
+          p('a', 'アリス', ROLES.VILLAGER),
+        ],
+        { w1: 'a', w2: 'a' } // 2人ともアリスを狙う
+      );
+      const { killedPlayerName, updatedState } = processNightActions(room);
+      expect(killedPlayerName).toBe('アリス');
+      expect(updatedState.players['a'].isAlive).toBe(false);
+    });
+
+    it('人狼が2人いて、別々の人を襲撃する → 誰も死なない（襲撃失敗）', () => {
+      const room = makeRoom(
+        [
+          p('w1', '人狼A', ROLES.WEREWOLF),
+          p('w2', '人狼B', ROLES.WEREWOLF),
+          p('a', 'アリス', ROLES.VILLAGER),
+          p('b', 'ボブ', ROLES.VILLAGER),
+        ],
+        { w1: 'a', w2: 'b' } // Aはアリス、Bはボブを狙う
+      );
+      const { killedPlayerName, updatedState } = processNightActions(room);
+      expect(killedPlayerName).toBeNull();
+      expect(updatedState.players['a'].isAlive).toBe(true);
+      expect(updatedState.players['b'].isAlive).toBe(true);
+    });
+
+    it('人狼が2人いて、片方が未選択 → 誰も死なない（襲撃失敗）', () => {
+      const room = makeRoom(
+        [
+          p('w1', '人狼A', ROLES.WEREWOLF),
+          p('w2', '人狼B', ROLES.WEREWOLF),
+          p('a', 'アリス', ROLES.VILLAGER),
+        ],
+        { w1: 'a', w2: null } // Bは未選択
+      );
+      const { killedPlayerName, updatedState } = processNightActions(room);
+      expect(killedPlayerName).toBeNull();
+      expect(updatedState.players['a'].isAlive).toBe(true);
+    });
+
+    it('人狼が2人いて、うち1人は死亡している → 生きている人狼のアクションのみで襲撃が決定する', () => {
+      const room = makeRoom(
+        [
+          p('w1', '人狼A（生存）', ROLES.WEREWOLF),
+          p('w2', '人狼B（死亡）', ROLES.WEREWOLF, false), // 死亡している
+          p('a', 'アリス', ROLES.VILLAGER),
+        ],
+        { w1: 'a' } // 生きている人狼Aだけがアクション
+      );
+      const { killedPlayerName, updatedState } = processNightActions(room);
+      expect(killedPlayerName).toBe('アリス');
+      expect(updatedState.players['a'].isAlive).toBe(false);
+    });
   });
 
   // ─── 騎士の護衛 ────────────────────────

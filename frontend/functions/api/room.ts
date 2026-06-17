@@ -151,6 +151,21 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     switch (type) {
       case 'join_room': {
         if (!playerId) return new Response("Missing playerId", { status: 400 });
+
+        const requestedName = (payload.playerName || '').trim();
+        const duplicateExists = Object.values(roomState.players).some(
+          (p: any) => p.id !== playerId && p.name === requestedName
+        );
+        if (duplicateExists) {
+          return new Response(JSON.stringify({ error: "その名前はすでに使われています" }), {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": "*"
+            }
+          });
+        }
+
         const isNew = !roomState.players[playerId];
         roomState.players[playerId] = {
           id: playerId,

@@ -110,7 +110,7 @@ export default function Room() {
   // アクション送信時に HTTP POST API を呼び出す
   const emit = async (type, payload = {}, options = {}) => {
     try {
-      await fetch('/api/room', {
+      const res = await fetch('/api/room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -121,8 +121,10 @@ export default function Room() {
         }),
         ...options
       });
+      return res;
     } catch (err) {
       console.error('API Error:', err);
+      throw err;
     }
   };
 
@@ -160,9 +162,22 @@ export default function Room() {
     // 1. 全員用プレゼンスチャンネルの購読
     const channel = pusher.subscribe(`presence-room-${roomId}`);
 
-    channel.bind('pusher:subscription_succeeded', () => {
+    channel.bind('pusher:subscription_succeeded', async () => {
       // 接続成功したら部屋参加APIを叩く
-      emit('join_room', { playerName });
+      try {
+        const res = await emit('join_room', { playerName });
+        if (!res.ok) {
+          const errorData = await res.json();
+          alert(errorData.error || 'ルームへの参加に失敗しました');
+          setIsNameSet(false);
+          pusher.disconnect();
+        }
+      } catch (err) {
+        console.error('Join room failed:', err);
+        alert('サーバーとの通信に失敗しました');
+        setIsNameSet(false);
+        pusher.disconnect();
+      }
     });
 
     channel.bind('room_update', (data) => {
@@ -262,11 +277,31 @@ export default function Room() {
     }
   }, [lockedWolfTarget, selectedPlayerId, isMyActionDone]);
 
-  const handleJoinRoom = () => {
-    if (!playerName.trim()) {
+  const handleJoinRoom = async () => {
+    const trimmedName = playerName.trim();
+    if (!trimmedName) {
       alert('名前を入力してください');
       return;
     }
+
+    try {
+      // 事前に最新の部屋データを取得して名前重複をチェック
+      const res = await fetch(`/api/room?roomId=${roomId}`);
+      if (res.ok) {
+        const data = await res.json();
+        // 自分（myId）以外のプレイヤーで、同じ名前の人が既に生存・存在しているかチェック
+        const duplicateExists = Object.values(data.players || {}).some(
+          (p) => p.id !== myId && p.name === trimmedName
+        );
+        if (duplicateExists) {
+          alert('その名前はすでに使われています');
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to check duplicate name:', err);
+    }
+
     setIsNameSet(true);
   };
 

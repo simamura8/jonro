@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { checkWinCondition, isPlayerSelectable } from '../gameLogic';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Pusher from 'pusher-js';
 import { Copy, Play, Send, Moon, Sun, Skull, Trophy } from 'lucide-react';
@@ -148,7 +149,9 @@ export default function Room() {
     });
 
     channel.bind('room_update', (data) => {
+      console.log('[DEBUG-CLIENT] RECEIVED room_update Event!');
       const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+      console.log('[DEBUG-CLIENT] parsedData:', parsedData);
       setRoom(parsedData);
       setSelectedPlayerId(null);
       setActionDone(false);
@@ -201,17 +204,24 @@ export default function Room() {
 
   // 人狼の複数同期：他の人狼がすでに選んでいるターゲットを特定
   const lockedWolfTarget = useMemo(() => {
+    console.log('[DEBUG-CLIENT] calculating lockedWolfTarget:', {
+      status: room?.status,
+      myRole: room?.players?.[myId]?.role,
+      nightActions: room?.nightActions,
+      myId: myId
+    });
     if (room?.status !== 'night' || room?.players?.[myId]?.role !== '人狼') return null;
     for (const [pid, tid] of Object.entries(room.nightActions || {})) {
       const otherPlayer = room.players[pid];
+      console.log('[DEBUG-CLIENT] checking action:', { pid, tid, otherRole: otherPlayer?.role });
       if (pid !== myId && otherPlayer?.role === '人狼' && otherPlayer.isAlive && tid) {
+        console.log('[DEBUG-CLIENT] FOUND locked target:', tid);
         return tid;
       }
     }
     return null;
   }, [room?.status, room?.nightActions, room?.players, myId]);
 
-  // ロックされたターゲットがあれば強制的に選択状態にする
   const isMyActionDone = actionDone || (
     room?.status === 'night'
       ? (room.nightActions && room.nightActions[myId] !== undefined)
@@ -220,9 +230,10 @@ export default function Room() {
         : false
   );
 
+  // ロックされたターゲットがあれば、現在選択中の無効なプレイヤーの選択を解除する
   useEffect(() => {
-    if (lockedWolfTarget && selectedPlayerId !== lockedWolfTarget && !isMyActionDone) {
-      setSelectedPlayerId(lockedWolfTarget);
+    if (lockedWolfTarget && selectedPlayerId && selectedPlayerId !== lockedWolfTarget && !isMyActionDone) {
+      setSelectedPlayerId(null);
     }
   }, [lockedWolfTarget, selectedPlayerId, isMyActionDone]);
 
@@ -371,14 +382,7 @@ export default function Room() {
   const isHost = Object.keys(room.players)[0] === myId;
   const playersList = Object.values(room.players);
 
-  // 自分がアクション（夜のアクションまたは投票）を完了しているか判定
-  const isMyActionDone = actionDone || (
-    room.status === 'night'
-      ? (room.nightActions && room.nightActions[myId] !== undefined)
-      : room.status === 'voting'
-        ? (room.votes && room.votes[myId] !== undefined)
-        : false
-  );
+
 
 
   const getRoleClass = (role) => {
@@ -537,28 +541,8 @@ export default function Room() {
                 {playersList.map((p) => {
                   const isCandidate = !room.candidates || room.candidates.includes(p.id);
                   
-                  // 夜のフェーズにおいて特定のプレイヤーを選択不可にするバリデーション
-                  let isNightTargetValid = true;
-                  if (room.status === 'night' && myPlayer) {
-                    // 1. 自分自身を選べない役職 (占い師、怪盗、騎士、人狼)
-                    const cannotSelectSelf = ['占い師', '怪盗', '騎士', '人狼'].includes(myPlayer.role);
-                    if (cannotSelectSelf && p.id === myId) {
-                      isNightTargetValid = false;
-                    }
-                    // 2. 味方の人狼を選べない (人狼)
-                    if (myPlayer.role === '人狼' && p.role === '人狼') {
-                      isNightTargetValid = false;
-                    }
-                    // 3. 人狼が複数いる場合、仲間が選んだターゲット以外は選べない
-                    if (myPlayer.role === '人狼' && lockedWolfTarget && p.id !== lockedWolfTarget) {
-                      isNightTargetValid = false;
-                    }
-                  }
-
-                  const isSelectable = p.isAlive && !isMyActionDone && (
-                    (room.status === 'night' && isNightTargetValid) ||
-                    (room.status === 'voting' && isCandidate)
-                  );
+                  // プレイヤーが選択可能かどうか（グレーアウトするか）を判定
+                  const isSelectable = isPlayerSelectable(room, myId, p.id, lockedWolfTarget, isMyActionDone);
 
                   const isSelected = selectedPlayerId === p.id;
 
@@ -575,7 +559,7 @@ export default function Room() {
                     : {};
 
                   // 夜フェーズで選択不可のプレイヤーカードをグレーアウトするスタイル
-                  const notSelectableNightStyle = room.status === 'night' && !isMyActionDone && !isSelectable && p.isAlive
+                  const notSelectableNightStyle = room.status === 'night' && !isSelectable && p.isAlive
                     ? { opacity: 0.4, cursor: 'not-allowed' }
                     : {};
 

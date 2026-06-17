@@ -213,3 +213,48 @@ export function getLockedWolfTarget(
   }
   return null;
 }
+
+// ─────────────────────────────────────────────
+// プレイヤーが画面上で選択可能（グレーアウトしない）かの判定
+// ─────────────────────────────────────────────
+export function isPlayerSelectable(
+  room: any,
+  myId: string,
+  targetId: string,
+  lockedWolfTarget: string | null,
+  isMyActionDone: boolean
+): boolean {
+  const myPlayer = room.players[myId];
+  const targetPlayer = room.players[targetId];
+
+  if (!targetPlayer || !targetPlayer.isAlive || isMyActionDone) {
+    return false;
+  }
+
+  if (room.status === 'voting') {
+    const isCandidate = !room.candidates || room.candidates.includes(targetId);
+    return isCandidate;
+  }
+
+  if (room.status === 'night') {
+    let isNightTargetValid = true;
+    if (myPlayer) {
+      // 1. 自分自身を選べない役職 (占い師、怪盗、騎士、人狼)
+      const cannotSelectSelf = ['占い師', '怪盗', '騎士', '人狼'].includes(myPlayer.role);
+      if (cannotSelectSelf && targetId === myId) {
+        isNightTargetValid = false;
+      }
+      // 2. 味方の人狼を選べない (人狼)
+      if (myPlayer.role === ROLES.WEREWOLF && targetPlayer.role === ROLES.WEREWOLF) {
+        isNightTargetValid = false;
+      }
+      // 3. 人狼が複数いる場合、仲間が選んだターゲット以外は選べない
+      if (myPlayer.role === ROLES.WEREWOLF && lockedWolfTarget && targetId !== lockedWolfTarget) {
+        isNightTargetValid = false;
+      }
+    }
+    return isNightTargetValid;
+  }
+
+  return false;
+}

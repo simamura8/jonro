@@ -4,6 +4,7 @@ import {
   processNightActions,
   tallyVotes,
   getLockedWolfTarget,
+  isPlayerSelectable,
   ROLES,
   type RoomState,
   type Player,
@@ -697,5 +698,50 @@ describe('getLockedWolfTarget()', () => {
     const nightActions = { deadWolf: 'villager' };
     const target = getLockedWolfTarget(nightActions, players, 'wolf1');
     expect(target).toBeNull();
+  });
+});
+
+// ═════════════════════════════════════════════
+// 7. isPlayerSelectable のテスト（UIでのグレーアウト・選択不可判定）
+// ═════════════════════════════════════════════
+describe('isPlayerSelectable()', () => {
+  const baseRoom = {
+    status: 'night',
+    players: {
+      wolf1: { role: ROLES.WEREWOLF, isAlive: true, name: 'Wolf 1', id: 'wolf1' },
+      wolf2: { role: ROLES.WEREWOLF, isAlive: true, name: 'Wolf 2', id: 'wolf2' },
+      villager1: { role: ROLES.VILLAGER, isAlive: true, name: 'Villager 1', id: 'villager1' },
+      villager2: { role: ROLES.VILLAGER, isAlive: true, name: 'Villager 2', id: 'villager2' },
+      deadPlayer: { role: ROLES.VILLAGER, isAlive: false, name: 'Dead', id: 'deadPlayer' }
+    }
+  };
+
+  it('死亡しているプレイヤーは常に選択不可', () => {
+    expect(isPlayerSelectable(baseRoom, 'wolf1', 'deadPlayer', null, false)).toBe(false);
+  });
+
+  it('自分のアクションが完了済みなら全員選択不可', () => {
+    expect(isPlayerSelectable(baseRoom, 'wolf1', 'villager1', null, true)).toBe(false);
+  });
+
+  it('人狼は自分自身を選択不可', () => {
+    expect(isPlayerSelectable(baseRoom, 'wolf1', 'wolf1', null, false)).toBe(false);
+  });
+
+  it('人狼は味方の人狼を選択不可', () => {
+    expect(isPlayerSelectable(baseRoom, 'wolf1', 'wolf2', null, false)).toBe(false);
+  });
+
+  it('他の人狼がまだアクションを決めていない場合、村人を自由に選択可能', () => {
+    expect(isPlayerSelectable(baseRoom, 'wolf1', 'villager1', null, false)).toBe(true);
+    expect(isPlayerSelectable(baseRoom, 'wolf1', 'villager2', null, false)).toBe(true);
+  });
+
+  it('他の人狼が【villager1】をロックした場合、villager1は選択可能だが、villager2は選択不可になる（グレーアウトされる）', () => {
+    const lockedTarget = 'villager1';
+    // villager1 はロックされているので選べる
+    expect(isPlayerSelectable(baseRoom, 'wolf2', 'villager1', lockedTarget, false)).toBe(true);
+    // villager2 はロックされていないので選べない（グレーアウト！）
+    expect(isPlayerSelectable(baseRoom, 'wolf2', 'villager2', lockedTarget, false)).toBe(false);
   });
 });

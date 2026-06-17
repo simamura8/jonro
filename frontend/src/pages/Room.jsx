@@ -33,6 +33,23 @@ export default function Room() {
   const [actionDone, setActionDone] = useState(false);
   const messagesEndRef = useRef(null);
   const [particles, setParticles] = useState([]);
+  const [timeLeft, setTimeLeft] = useState(180);
+
+  useEffect(() => {
+    if (room?.status === 'day') {
+      setTimeLeft(180);
+    }
+  }, [room?.status, room?.dayCount]);
+
+  useEffect(() => {
+    let timer;
+    if (room?.status === 'day' && timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft(prev => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [room?.status, timeLeft]);
 
   useEffect(() => {
     const items = [];
@@ -174,14 +191,17 @@ export default function Room() {
     };
   }, [roomId, isNameSet, playerName, myId]);
 
-  // 人狼専用チャネルの動的購読
+  // 専用チャネルの動的購読（人狼用・霊界用）
   useEffect(() => {
     if (!pusherInstance || !room) return;
     const myPlayer = room.players[myId];
     const wolvesChannelName = `private-room-${roomId}-wolves`;
+    const ghostsChannelName = `private-room-${roomId}-ghosts`;
 
-    if (myPlayer?.role === '人狼' && myPlayer.isAlive) {
-      // まだ購読していない場合のみ購読
+    // 1. 人狼チャネルの購読判定（生きている人狼、または死亡した任意のプレイヤー）
+    const shouldSubscribeWolves = (myPlayer?.role === '人狼' && myPlayer?.isAlive) || (!myPlayer?.isAlive);
+    
+    if (shouldSubscribeWolves) {
       if (!pusherInstance.channel(wolvesChannelName)) {
         const wolvesChannel = pusherInstance.subscribe(wolvesChannelName);
         wolvesChannel.bind('chat_message', (data) => {
@@ -189,9 +209,24 @@ export default function Room() {
         });
       }
     } else {
-      // 人狼でない、または死亡した場合は購読を解除する
       if (pusherInstance.channel(wolvesChannelName)) {
         pusherInstance.unsubscribe(wolvesChannelName);
+      }
+    }
+
+    // 2. 霊界チャネルの購読判定（死亡したプレイヤーのみ）
+    const shouldSubscribeGhosts = !myPlayer?.isAlive;
+
+    if (shouldSubscribeGhosts) {
+      if (!pusherInstance.channel(ghostsChannelName)) {
+        const ghostsChannel = pusherInstance.subscribe(ghostsChannelName);
+        ghostsChannel.bind('chat_message', (data) => {
+          setMessages((prev) => [...prev, data]);
+        });
+      }
+    } else {
+      if (pusherInstance.channel(ghostsChannelName)) {
+        pusherInstance.unsubscribe(ghostsChannelName);
       }
     }
   }, [room, myId, pusherInstance, roomId]);
@@ -598,8 +633,8 @@ export default function Room() {
                       {myPlayer?.role === '人狼' && p.role === '人狼' && room.status !== 'waiting' && (
                         <div className="role-badge role-werewolf" style={{ fontSize: '0.6rem' }}>人狼</div>
                       )}
-                      {/* 終了時は全員の役職を表示 */}
-                      {room.status === 'finished' && p.role && (
+                      {/* 終了時または自分が死亡している場合は全員の役職を表示 */}
+                      {(room.status === 'finished' || !myPlayer?.isAlive) && p.role && (
                         <div className={`role-badge ${getRoleClass(p.role)}`} style={{ fontSize: '0.6rem' }}>{p.role}</div>
                       )}
                     </div>
@@ -652,10 +687,20 @@ export default function Room() {
                 </div>
               )}
 
-              {room.status === 'day' && isHost && (
-                <button className="btn btn-danger" style={{ width: '100%', marginTop: '1.5rem' }} onClick={handleGoToVote}>
-                  議論を終了し投票へ進む
-                </button>
+              {room.status === 'day' && (
+                <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#94a3b8' }}>議論時間</h4>
+                  <div style={{ fontSize: '2rem', fontWeight: 'bold', color: timeLeft <= 30 ? '#ef4444' : '#fbbf24', textShadow: '0 0 10px rgba(0,0,0,0.5)' }}>
+                    {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                  </div>
+                  {timeLeft === 0 && <p style={{ color: '#ef4444', margin: '0.5rem 0 0 0', fontWeight: 'bold' }}>目安時間が終了しました！</p>}
+                  
+                  {isHost && (
+                    <button className="btn btn-danger" style={{ width: '100%', marginTop: '1rem' }} onClick={handleGoToVote}>
+                      議論を終了し投票へ進む
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -667,7 +712,7 @@ export default function Room() {
               <div className="chat-container" style={{ marginTop: 0 }}>
                 <div className="chat-messages">
                   {messages.map((msg, idx) => (
-                    <div key={idx} className={`message ${msg.isSystem ? 'system' : msg.sender === myPlayer?.name ? 'me' : ''}`}>
+                    <div key={idx} className={`message ${msg.isSystem ? 'system' : ''} ${msg.sender === myPlayer?.name ? 'me' : ''} ${msg.isGhost ? 'ghost' : ''} ${msg.isWolfChat ? 'wolf' : ''}`}>
                       {!msg.isSystem && msg.sender !== myPlayer?.name && (
                         <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.25rem' }}>{msg.sender}</div>
                       )}
@@ -676,17 +721,21 @@ export default function Room() {
                   ))}
                   <div ref={messagesEndRef} />
                 </div>
-                {room.status !== 'waiting' && myPlayer?.isAlive && (
+                {room.status !== 'waiting' && myPlayer && (
                   <form className="chat-input-area" onSubmit={handleSendMessage}>
                     <input
                       type="text"
                       className="input-field"
-                      placeholder={room.status === 'night' ? (myPlayer.role === '人狼' ? "人狼チャット（仲間にのみ見えます）" : "夜は発言できません") : "メッセージを入力..."}
+                      placeholder={
+                        !myPlayer.isAlive ? "霊界チャット（生存者には見えません）" :
+                        room.status === 'night' ? (myPlayer.role === '人狼' ? "人狼チャット（仲間にのみ見えます）" : "夜は発言できません") : 
+                        "メッセージを入力..."
+                      }
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
-                      disabled={room.status === 'night' && myPlayer.role !== '人狼'}
+                      disabled={myPlayer.isAlive && room.status === 'night' && myPlayer.role !== '人狼'}
                     />
-                    <button type="submit" className="btn btn-primary" disabled={room.status === 'night' && myPlayer.role !== '人狼'}>
+                    <button type="submit" className="btn btn-primary" disabled={myPlayer.isAlive && room.status === 'night' && myPlayer.role !== '人狼'}>
                       <Send size={18} />
                     </button>
                   </form>

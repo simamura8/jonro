@@ -235,11 +235,23 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
       case 'send_message': {
         if (!playerId) return new Response("Missing playerId", { status: 400 });
         const player = roomState.players[playerId];
-        if (!player || !player.isAlive) return new Response("Player unauthorized or dead", { status: 403 });
+        if (!player) return new Response("Player unauthorized", { status: 403 });
 
         broadcastState = false; // チャットメッセージ送信のみなので部屋状態全体のブロードキャストはスキップ
 
-        if (roomState.status === 'night' && player.role === ROLES.WEREWOLF) {
+        if (!player.isAlive) {
+          // 霊界チャットに送信
+          messagesToBroadcast.push({
+            channel: `private-room-${roomId}-ghosts`,
+            event: 'chat_message',
+            payload: {
+              sender: player.name,
+              text: `[霊界] ${payload.text}`,
+              isSystem: false,
+              isGhost: true
+            }
+          });
+        } else if (roomState.status === 'night' && player.role === ROLES.WEREWOLF) {
           // 人狼専用チャットに送信
           messagesToBroadcast.push({
             channel: `private-room-${roomId}-wolves`,
@@ -247,7 +259,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
             payload: {
               sender: player.name,
               text: `[人狼チャット] ${payload.text}`,
-              isSystem: false
+              isSystem: false,
+              isWolfChat: true
             }
           });
         } else {
@@ -498,6 +511,15 @@ async function processNightActions(roomState: any, roomId: string, messagesToBro
 
   const winner = checkWinCondition(roomState);
   if (winner) {
+    messagesToBroadcast.push({
+      channel: `presence-room-${roomId}`,
+      event: 'chat_message',
+      payload: {
+        sender: 'System',
+        text: `朝になりました。昨晩の犠牲者：${killedPlayerName}。`,
+        isSystem: true
+      }
+    });
     endGame(roomState, winner, messagesToBroadcast);
     return;
   }

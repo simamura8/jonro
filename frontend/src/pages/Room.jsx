@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { checkWinCondition, isPlayerSelectable } from '../gameLogic';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Pusher from 'pusher-js';
@@ -149,9 +149,7 @@ export default function Room() {
     });
 
     channel.bind('room_update', (data) => {
-      console.log('[DEBUG-CLIENT] RECEIVED room_update Event!');
       const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
-      console.log('[DEBUG-CLIENT] parsedData:', parsedData);
       setRoom(parsedData);
       setSelectedPlayerId(null);
       setActionDone(false);
@@ -204,18 +202,10 @@ export default function Room() {
 
   // 人狼の複数同期：他の人狼がすでに選んでいるターゲットを特定
   const lockedWolfTarget = useMemo(() => {
-    console.log('[DEBUG-CLIENT] calculating lockedWolfTarget:', {
-      status: room?.status,
-      myRole: room?.players?.[myId]?.role,
-      nightActions: room?.nightActions,
-      myId: myId
-    });
     if (room?.status !== 'night' || room?.players?.[myId]?.role !== '人狼') return null;
     for (const [pid, tid] of Object.entries(room.nightActions || {})) {
       const otherPlayer = room.players[pid];
-      console.log('[DEBUG-CLIENT] checking action:', { pid, tid, otherRole: otherPlayer?.role });
       if (pid !== myId && otherPlayer?.role === '人狼' && otherPlayer.isAlive && tid) {
-        console.log('[DEBUG-CLIENT] FOUND locked target:', tid);
         return tid;
       }
     }

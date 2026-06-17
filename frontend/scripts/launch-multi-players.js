@@ -64,7 +64,7 @@ async function launchPlayers() {
     pages.push(hostPage);
 
     // ローカルホストを開く
-    await hostPage.goto('http://localhost:8788/');
+    await hostPage.goto('http://localhost:5173/');
     
     // タイトル画面をクリックしてフォームへ進む
     await hostPage.click('.tt-root');

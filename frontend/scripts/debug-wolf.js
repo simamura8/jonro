@@ -24,8 +24,9 @@ async function runDebug() {
     for (let i = 0; i < 5; i++) {
       const name = playerNames[i];
       const pos = positions[i];
+      console.log(`[Player ${name}] ブラウザ起動中...`);
       const browser = await chromium.launch({
-        headless: false,
+        headless: process.env.HEADLESS === 'true',
         args: [
           `--window-position=${pos.x},${pos.y}`,
           `--window-size=${width},${height}`,
@@ -38,14 +39,19 @@ async function runDebug() {
       pages.push(page);
 
       page.on('console', msg => {
-        if (msg.type() === 'error' || msg.text().includes('Pusher') || msg.text().includes('night') || msg.text().includes('DEBUG')) {
-          console.log(`[Browser ${name}] ${msg.type().toUpperCase()}: ${msg.text()}`);
+        console.log(`[Browser ${name}] ${msg.type().toUpperCase()}: ${msg.text()}`);
+      });
+
+      page.on('pageerror', error => {
+        console.error(`❌ [Browser ${name}] PAGE ERROR:`, error.message);
+        if (error.stack) {
+          console.error(error.stack);
         }
       });
 
       if (i === 0) {
         // ホストでルーム作成
-        await page.goto('http://localhost:8788/');
+        await page.goto('http://localhost:5173/');
         await page.click('.tt-root');
         await page.waitForSelector('.tf-input');
         await page.fill('.tf-input', name);
@@ -55,12 +61,19 @@ async function runDebug() {
         console.log(`[Host] ルーム作成完了: ${roomUrl}`);
       } else {
         // ゲストで入室
-        await page.goto(roomUrl);
-        await page.waitForSelector('.tf-input');
-        await page.fill('.tf-input', name);
-        await page.click('.tf-btn');
-        await page.waitForSelector('.player-grid');
-        console.log(`[Guest ${i}] ${name} 入室完了`);
+        try {
+          await page.goto(roomUrl);
+          await page.waitForSelector('.tf-input', { timeout: 10000 });
+          await page.fill('.tf-input', name);
+          await page.click('.tf-btn');
+          await page.waitForSelector('.player-grid');
+          console.log(`[Guest ${i}] ${name} 入室完了`);
+        } catch (err) {
+          console.error(`❌ [Guest ${i}] ${name} 入室エラー:`, err.message);
+          const html = await page.content();
+          console.log(`[HTML of ${name}]:`, html.substring(0, 1500));
+          throw err;
+        }
       }
     }
 
@@ -123,7 +136,7 @@ async function runDebug() {
 
       // サーバーから最新の roomState を取得してデバッグ出力
       const roomId = roomUrl.split('/').pop();
-      const response = await fetch(`http://localhost:8788/api/room?roomId=${roomId}`);
+      const response = await fetch(`http://localhost:5173/api/room?roomId=${roomId}`);
       const apiRoomState = await response.json();
       console.log('📡 サーバーから取得した現在の roomState:');
       console.log(JSON.stringify(apiRoomState, null, 2));
@@ -152,12 +165,16 @@ async function runDebug() {
       console.log('⚠️ 人狼が2人以上いません。役職配分の結果、人狼が足りませんでした。');
     }
 
-    console.log('デバッグ完了。Enterキーを押すと終了します。');
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout
-    });
-    await new Promise((resolve) => rl.question('', () => { rl.close(); resolve(); }));
+    if (process.env.HEADLESS !== 'true') {
+      console.log('デバッグ完了。Enterキーを押すと終了します。');
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+      });
+      await new Promise((resolve) => rl.question('', () => { rl.close(); resolve(); }));
+    } else {
+      console.log('デバッグ完了。HEADLESSモードのため自動終了します。');
+    }
 
   } catch (error) {
     console.error('❌ デバッグエラー:', error);

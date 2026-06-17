@@ -31,6 +31,7 @@ export default function Room() {
   const [isNameSet, setIsNameSet] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
   const [actionDone, setActionDone] = useState(false);
+  const [joinError, setJoinError] = useState('');
   const messagesEndRef = useRef(null);
   const [particles, setParticles] = useState([]);
   const [timeLeft, setTimeLeft] = useState(180);
@@ -168,13 +169,13 @@ export default function Room() {
         const res = await emit('join_room', { playerName });
         if (!res.ok) {
           const errorData = await res.json();
-          alert(errorData.error || 'ルームへの参加に失敗しました');
+          setJoinError(errorData.error || 'ルームへの参加に失敗しました');
           setIsNameSet(false);
           pusher.disconnect();
         }
       } catch (err) {
         console.error('Join room failed:', err);
-        alert('サーバーとの通信に失敗しました');
+        setJoinError('サーバーとの通信に失敗しました');
         setIsNameSet(false);
         pusher.disconnect();
       }
@@ -280,7 +281,7 @@ export default function Room() {
   const handleJoinRoom = async () => {
     const trimmedName = playerName.trim();
     if (!trimmedName) {
-      alert('名前を入力してください');
+      setJoinError('名前を入力してください');
       return;
     }
 
@@ -294,7 +295,7 @@ export default function Room() {
           (p) => p.id !== myId && p.name === trimmedName
         );
         if (duplicateExists) {
-          alert('その名前はすでに使われています');
+          setJoinError('その名前はすでに使われています');
           return;
         }
       }
@@ -302,6 +303,7 @@ export default function Room() {
       console.error('Failed to check duplicate name:', err);
     }
 
+    setJoinError('');
     setIsNameSet(true);
   };
 
@@ -407,6 +409,18 @@ export default function Room() {
               onChange={(e) => setPlayerName(e.target.value)}
               maxLength={10}
             />
+            {joinError && (
+              <p style={{ 
+                color: '#ef4444', 
+                fontSize: '0.85rem', 
+                marginTop: '0.5rem', 
+                marginBottom: '0.5rem',
+                fontWeight: 'bold',
+                fontFamily: 'Noto Sans JP, sans-serif'
+              }}>
+                ⚠️ {joinError}
+              </p>
+            )}
             <button className="tf-btn" onClick={handleJoinRoom}>
               ルームに入る
             </button>

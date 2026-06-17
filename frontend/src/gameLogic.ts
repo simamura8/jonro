@@ -33,6 +33,7 @@ export interface RoomState {
   lastExecutedId: string | null;
   logs: string[];
   rolePool: Role[];
+  firstNightVictim: boolean;
 }
 
 // ─────────────────────────────────────────────
@@ -239,6 +240,11 @@ export function isPlayerSelectable(
   if (room.status === 'night') {
     let isNightTargetValid = true;
     if (myPlayer) {
+      // 0. 初日犠牲者なしの場合、初日の人狼は誰も選べない
+      if (myPlayer.role === ROLES.WEREWOLF && room.dayCount === 1 && !room.firstNightVictim) {
+        return false;
+      }
+      
       // 1. 自分自身を選べない役職 (占い師、怪盗、騎士、人狼)
       const cannotSelectSelf = ['占い師', '怪盗', '騎士', '人狼'].includes(myPlayer.role);
       if (cannotSelectSelf && targetId === myId) {

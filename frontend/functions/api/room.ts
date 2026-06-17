@@ -70,7 +70,8 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
         isRevote: false,
         candidates: null,
         rolePool: [ROLES.VILLAGER, ROLES.WEREWOLF, ROLES.SEER],
-        lastExecutedId: null
+        lastExecutedId: null,
+        firstNightVictim: false
       };
       return new Response(JSON.stringify(initialRoomState), {
         headers: {
@@ -136,7 +137,8 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         isRevote: false,
         candidates: null,
         rolePool: [ROLES.VILLAGER, ROLES.WEREWOLF, ROLES.SEER],
-        lastExecutedId: null
+        lastExecutedId: null,
+        firstNightVictim: false
       };
     } else {
       roomState = JSON.parse(d1Result.state);
@@ -221,6 +223,15 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
         break;
       }
 
+      case 'update_settings': {
+        if (roomState.status === 'waiting') {
+          if (payload.firstNightVictim !== undefined) {
+            roomState.firstNightVictim = payload.firstNightVictim;
+          }
+        }
+        break;
+      }
+
       case 'send_message': {
         if (!playerId) return new Response("Missing playerId", { status: 400 });
         const player = roomState.players[playerId];
@@ -262,19 +273,23 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
         // 人狼の複数同期検証（サーバーサイド）
         if (player.role === ROLES.WEREWOLF) {
-          let lockedTarget = null;
-          for (const [pid, tid] of Object.entries(roomState.nightActions || {})) {
-            const otherPlayer = roomState.players[pid] as any;
-            if (pid !== playerId && otherPlayer?.role === ROLES.WEREWOLF && otherPlayer.isAlive && tid) {
-              lockedTarget = tid;
-              break;
+          if (roomState.dayCount === 1 && !roomState.firstNightVictim) {
+            payload.targetId = null; // 初日犠牲者なしの場合、強制的にターゲットなし
+          } else {
+            let lockedTarget = null;
+            for (const [pid, tid] of Object.entries(roomState.nightActions || {})) {
+              const otherPlayer = roomState.players[pid] as any;
+              if (pid !== playerId && otherPlayer?.role === ROLES.WEREWOLF && otherPlayer.isAlive && tid) {
+                lockedTarget = tid;
+                break;
+              }
             }
-          }
-          if (lockedTarget && payload.targetId !== lockedTarget) {
-            return new Response(JSON.stringify({ error: "仲間の人狼とターゲットを合わせる必要があります。" }), {
-              status: 400,
-              headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-            });
+            if (lockedTarget && payload.targetId !== lockedTarget) {
+              return new Response(JSON.stringify({ error: "仲間の人狼とターゲットを合わせる必要があります。" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+              });
+            }
           }
         }
 

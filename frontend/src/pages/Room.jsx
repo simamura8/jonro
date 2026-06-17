@@ -392,6 +392,10 @@ export default function Room() {
     emit('update_roles', { roles: [...room.rolePool, role] });
   };
 
+  const handleToggleFirstNightVictim = () => {
+    emit('update_settings', { firstNightVictim: !room.firstNightVictim });
+  };
+
   const handleRemoveRole = (indexToRemove) => {
     const newRoles = room.rolePool.filter((_, idx) => idx !== indexToRemove);
     emit('update_roles', { roles: newRoles });
@@ -438,6 +442,11 @@ export default function Room() {
                     </div>
                   ))}
                 </div>
+
+                <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>初日犠牲者: </span>
+                  <span style={{ fontWeight: 'bold', color: room.firstNightVictim ? '#ef4444' : '#10b981' }}>{room.firstNightVictim ? 'あり' : 'なし'}</span>
+                </div>
                 
                 {isHost && (
                   <div>
@@ -454,6 +463,21 @@ export default function Room() {
                           + {role}
                         </button>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {isHost && (
+                  <div style={{ marginTop: '1.5rem' }}>
+                    <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: '#94a3b8' }}>設定を変更：</p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <button 
+                        className="btn"
+                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', background: room.firstNightVictim ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255,255,255,0.06)', color: 'white', border: '1px solid rgba(255,255,255,0.15)' }}
+                        onClick={handleToggleFirstNightVictim}
+                      >
+                        初日犠牲者{room.firstNightVictim ? 'なしにする' : 'ありにする'}
+                      </button>
                     </div>
                   </div>
                 )}
@@ -591,14 +615,14 @@ export default function Room() {
                      myPlayer.role === '狂人' ? 'あなたは狂人です。人狼に加担しますが、誰が人狼かはわかりません。夜は何もできません。完了ボタンを押してください。' :
                      myPlayer.role === '霊媒師' ? 'あなたは霊媒師です。処刑されたプレイヤーの正体を知ることができます。夜のアクションはありません。完了ボタンを押してください。' :
                      myPlayer.role === '怪盗' ? (room.dayCount === 1 ? 'あなたは怪盗です。役職を奪いたい相手を選んでください。' : 'あなたは怪盗です。夜は何もできません。完了ボタンを押してください。') :
-                     myPlayer.role === '人狼' ? '襲撃する相手を選んでください。' :
+                     myPlayer.role === '人狼' ? (room.dayCount === 1 && !room.firstNightVictim ? '初日の夜なので何もできません。完了ボタンを押してください。' : '襲撃する相手を選んでください。') :
                      myPlayer.role === '占い師' ? '占う相手を選んでください。' :
                      '護衛する相手を選んでください。'}
                   </p>
                   <button 
                     className="btn btn-primary" 
                     style={{ width: '100%' }}
-                    disabled={(myPlayer.role !== '村人' && myPlayer.role !== '狂人' && myPlayer.role !== '霊媒師' && !(myPlayer.role === '怪盗' && room.dayCount > 1)) && !selectedPlayerId}
+                    disabled={(myPlayer.role !== '村人' && myPlayer.role !== '狂人' && myPlayer.role !== '霊媒師' && !(myPlayer.role === '怪盗' && room.dayCount > 1) && !(myPlayer.role === '人狼' && room.dayCount === 1 && !room.firstNightVictim)) && !selectedPlayerId}
                     onClick={handleNightAction}
                   >
                     アクションを決定する
